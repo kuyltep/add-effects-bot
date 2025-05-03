@@ -90,18 +90,7 @@ model UserSettings {
   updatedAt         DateTime   @updatedAt
 }
 
-model ReveAccount {
-  id              String    @id @default(cuid())
-  authorization   String    @db.Text
-  cookie          String    @db.Text
-  projectId       String
-  isActive        Boolean   @default(true)
-  lastErrorAt     DateTime?
-  lastUsedAt      DateTime?
-  generationCount Int       @default(0)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-}
+
 
 enum Role {
   USER
