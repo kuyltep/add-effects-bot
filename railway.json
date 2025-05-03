@@ -1,0 +1,11 @@
+{
+  "build": {
+    "builder": "NIXPACKS",
+    "buildCommand": "yarn install --production=false && yarn build"
+  },
+  "deploy": {
+    "startCommand": "yarn start",
+    "healthcheckPath": "/api/health",
+    "healthcheckTimeout": 120
+  }
+}

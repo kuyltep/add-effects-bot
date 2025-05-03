@@ -1,0 +1,9 @@
+{
+  "watch": ["src/**/*.ts", "src/**/*.json", ".env"],
+  "ignore": ["src/**/*.spec.ts", "node_modules", "dist"],
+  "exec": "node --max-old-space-size=1024 -r ts-node/register src/index.ts",
+  "ext": "ts,json",
+  "verbose": true,
+  "signal": "SIGTERM",
+  "delay": 1000
+} 

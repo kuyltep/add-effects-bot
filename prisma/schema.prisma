@@ -1,0 +1,127 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                   String        @id @default(cuid())
+  email                String        @unique
+  password             String
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  remainingGenerations Int           @default(5)
+  subscriptionActive   Boolean       @default(false)
+  subscriptionEndDate  DateTime?
+  referralCode         String        @unique
+  telegramId           String?       @unique
+  telegramUsername     String?
+  telegramChatId       String?
+  role                 Role          @default(USER)
+  payments             Payment[]
+  generations          Generation[]
+  referrals            Referral[]    @relation("ReferrerRelation")
+  invitedBy            Referral?     @relation("InvitedUserRelation")
+  settings             UserSettings?
+  isBanned             Boolean       @default(false)
+  banReason            String?
+  bannedAt             DateTime?
+}
+
+model Referral {
+  id            String   @id @default(cuid())
+  referrerId    String
+  referrer      User     @relation("ReferrerRelation", fields: [referrerId], references: [id])
+  invitedUserId String   @unique
+  invitedUser   User     @relation("InvitedUserRelation", fields: [invitedUserId], references: [id])
+  createdAt     DateTime @default(now())
+}
+
+model Payment {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id])
+  amount           Float
+  status           String
+  transactionId    Int      @unique @default(autoincrement())
+  subscriptionType String?
+  subscriptionDays Int?
+  generationsAdded Int?
+  createdAt        DateTime @default(now())
+}
+
+model Generation {
+  id               String           @id @default(cuid())
+  userId           String
+  user             User             @relation(fields: [userId], references: [id])
+  prompt           String
+  negativePrompt   String?
+  seed             Int
+  width            Int              @default(512)
+  height           Int              @default(512)
+  batchSize        Int              @default(1)
+  model            String           @default("realistic")
+  imageUrls        String[]
+  translatedPrompt String?
+  status           GenerationStatus @default(PENDING)
+  error            String?
+  chatId           String?
+  messageId        Int?
+  createdAt        DateTime         @default(now())
+}
+
+model UserSettings {
+  id                String     @id @default(cuid())
+  userId            String     @unique
+  user              User       @relation(fields: [userId], references: [id])
+  useNegativePrompt Boolean    @default(false)
+  useSeed           Boolean    @default(false)
+  batchSize         Int        @default(3)
+  resolution        Resolution @default(HORIZONTAL)
+  model             String     @default("rev3")
+  language          Language   @default(EN)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+}
+
+model ReveAccount {
+  id              String    @id @default(cuid())
+  authorization   String    @db.Text
+  cookie          String    @db.Text
+  projectId       String
+  isActive        Boolean   @default(true)
+  lastErrorAt     DateTime?
+  lastUsedAt      DateTime?
+  generationCount Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum GenerationStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum Resolution {
+  SQUARE
+  VERTICAL
+  HORIZONTAL
+}
+
+enum Language {
+  EN
+  RU
+}

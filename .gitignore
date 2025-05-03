@@ -1,0 +1,9 @@
+.env
+.cache
+.DS_Store
+.idea
+.vscode
+.cursor
+node_modules/
+uploads/
+dist/

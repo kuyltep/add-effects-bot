@@ -1,0 +1,279 @@
+{
+  "common": {
+    "error": "❌ Error",
+    "success": "✅ Success",
+    "cancel": "↩️ Cancel",
+    "save": "Save",
+    "loading": "🔄 Loading..."
+  },
+  "bot": {
+    "welcome": "Welcome to Avato memory bot! Use /help to see available commands.",
+    "commands": {
+      "start": "Start the bot",
+      "generate": "Generate a new image",
+      "status": "Check account status",
+      "help": "Show available commands",
+      "referral": "Referral program",
+      "balance": "Check balance",
+      "settings": "Bot settings"
+    },
+    "help": {
+      "info": "🤖 <b>Avato memory bot Commands</b>\n\n✨ <b>Image Generation</b>\n/generate - Create a new image\n/settings - help and bot settings\n\n👤 <b>Account</b>\n/register - Create a new account\n/login - Connect to an existing account\n/balance - Check your balance\n\n🫂 <b>Referrals</b>\n/referral - Get your referral code\n\n❓ <b>Help</b>\n/help - Show this message"
+    },
+    "greeting": {
+      "welcome_back": "Welcome back, {{name}}! You have {{remainingGenerations}} generations left.",
+      "first_time": "Welcome, {{name}}! Let's get started with Avato memory."
+    },
+    "errors": {
+      "general": "An error occurred. Please try again later.",
+      "payment_failed": "Failed to create payment. Please try again later.",
+      "user_banned": "Your account has been banned. Reason: {{reason}}. Please contact support for assistance."
+    },
+    "referral": {
+      "info": "🫂 <b>Referral Program</b>\n\nYou have invited: <b>{{count}}</b> users\n\nYour referral code: <b>{{code}}</b>\n\nShare this link to invite friends:\n<a href=\"{{link}}\">{{link}}</a>\n\nEach new user who joins with your link will give both of you {{referralBonus}} additional generations!",
+      "success": "🎉 Referral successfully applied! You've received {{referralBonus}} additional generations."
+    },
+    "generate": {
+      "promptTooShort": "Prompt too short. Please enter a more detailed description:",
+      "no_generations_left": "You have no generations left. Get more by:\n1. Sharing your referral link: {{link}}\n2. Buying more generation packages",
+      "starting": "Starting image generation...",
+      "analyzingPrompt": "Analyzing your prompt...",
+      "preparingImages": "Preparing your images...",
+      "queued": "🎯 Your request is queued! You are #{{position}} in queue.\n\nWe'll notify you when your images are ready.",
+      "negativePromptInfo": "Now, please enter a negative prompt (what you DON'T want to see in the image).\n\nOr type \"skip\" to use default negative prompts:",
+      "seedInfo": "Enter a seed number for reproducibility or type \"random\":\n\n(A seed allows you to regenerate the same image later)",
+      "random_button": "Random",
+      "skip_button": "Skip",
+      "invalidSeedFormat": "Please send a valid number or type \"random\".",
+      "batchSizeInfo": "How many images would you like to generate? (1-4)\n\nNote: This will use 1 generation credit regardless of batch size.",
+      "invalidBatchSize": "Please enter a number between 1 and 4.",
+      "processing": "🔄 Processing your request...\n\nGenerating images with the following settings:\nPrompt: {{prompt}}",
+      "completed": "✅ Generation completed!\n\nPrompt: {{prompt}}",
+      "translationNote": "Note: Your prompt was translated to English for better results.",
+      "cancelled": "Image generation cancelled.",
+      "noGenerations": "❌ You have no generations left.\n\nYou can:\n1. Share your referral link to get 5 free generations when someone signs up\n2. Buy more generation packages",
+      "remainingGenerations": "Great result! 😎\nYou have {{count}} photo generations left\nWant to try again?",
+      "uncompressed_files": "📎 Full-size files attached below.",
+      "documents_message": "And as files 📂",
+      "watermark": "<a href='https://t.me/{{botUsername}}?start=p_{{referralCode}}'>Created with Avato Memory Bot 📸</a>",
+      "error": "❌ Generation failed. Please try again or contact support: @{{supportUsername}}",
+      "creases_question": "Does the photo have visible creases or folds that need to be removed?\n\n⚪️ Restore photo without damage costs {{cost}} restorations\n🟡 Restore photo with damage costs {{cost_hard}} restorations",
+      "yes_button": "Yes - {{cost}} restorations",
+      "no_button": "No - {{cost}} restorations",
+      "no_photo": "Please send a photo to restore.",
+      "start": "🖼️ Let's restore your old photo! Please upload the photo you want to restore.",
+      "not_an_image": "The file you sent is not an image. Please send a photo or an image file.",
+      "crease_removal_error": "⚠️ The system for removing creases and folds is currently unavailable. Would you like to continue with basic photo restoration without crease removal?",
+      "continue_without_creases_yes": "Yes, continue",
+      "continue_without_creases_no": "No, cancel"
+    },
+    "video": {
+      "user_not_found": "User not found. Please start the bot again with /start.",
+      "insufficient_balance": "You don't have enough balance to generate a video. Video creation costs {{cost}} restorations, but you only have {{balance}}.",
+      "no_images": "No images found to create a video from. Please generate images first.",
+      "images_expired": "Images have expired or have been removed. Please create new images.",
+      "image_expired": "This image has expired or has been removed. Please create new images.",
+      "enter_prompt": "Now enter a prompt describing how you want the video to look and move. Be detailed!",
+      "processing": "⏳ Generating your video... This may take up to 1-2 minutes.",
+      "completed": "🎬 Your video is ready!",
+      "generation_error": "Error generating video. Your generations have been returned. Please try again later.",
+      "no_recent_generations": "No recent image generations found. Please generate images first.",
+      "no_images_found": "No valid images found for video generation.",
+      "cancelled": "Video generation cancelled. Your generations were not used.",
+      "image_button": "⚪️ Image {{number}}",
+      "please_select": "I found <b>{{count}}</b> images from your previous restorations. Please select one to create a video from.",
+      "processing_queued": "⏳ Your video generation request is queued. We'll notify you when your video is ready!",
+      "queued": "🎬 Your video generation has been queued. We'll notify you when it's ready.",
+      "translation_note": "Translated prompt",
+      "enhancing": "🔄 Enhancing your image before generating video...",
+      "enhancement_complete": "✨ Image enhancement complete. Now generating video...",
+      "enhancement_error": "Error enhancing image. Your generations have been returned. Please try again later.",
+      "entering": "🎬 Video Generation",
+      "no_valid_images": "No valid images found. You need to generate at least one image before you can create a video.",
+      "select_image": "Select an image to create a video.\nCost: {{cost}} credits",
+      "confirm_image": "You selected this image for video generation. Do you want to proceed?\nCost of video generation: {{cost}} generations",
+      "generating": "🎬 Generating a video...",
+      "video_error": "An error occurred during video generation. Please try again.",
+      "video_caption": "🎬 Video created by Avato Memory Bot",
+      "too_many_requests": "You have too many pending video generations. Please wait until they are completed.",
+      "select_effect": "Choose a video effect for your image:\n\n🎬 Animation - people on the photo will just slightly move and smile\n🤗 Hug - people on the photo will hug each other, there should be 2 people on the photo",
+      "animation_button": "Animation",
+      "hug_button": "Hug",
+      "animation_description": "Animation effect: Characters will show slight movements, gentle smiles, and natural expressions while maintaining a fixed camera.\nCost - {{cost}} restorations",
+      "hug_description": "Hug effect: The characters in the photo will animate to hug each other with warm, affectionate movements. On the photo should be two people.\nCost - {{cost}} restorations",
+      "confirm_button": "✅ Confirm",
+      "back_button": "⬅️ Back"
+    },
+    "buttons": {
+      "invite_friend": "👥 Invite Friend",
+      "buy_generations": "🛒 Buy Generations",
+      "generate_more": "🎨 Generate More",
+      "generate_now": "🖼️ Restore photo now",
+      "register": "📝 Register",
+      "login": "🔑 Login",
+      "upgrade_image": "✨ Upgrade Photo",
+      "generate_video": "🎬 Generate Video"
+    },
+    "packages": {
+      "intro": "🛒 <b>Generation Packages</b>\n\nYou currently have <b>{{remainingGenerations}}</b> generations.\n\nSelect a package to purchase more generations:",
+      "package100": "{{package100_count}} Generations - {{package100_price}}₽",
+      "package250": "{{package250_count}} Generations - {{package250_price}}₽",
+      "package500": "{{package500_count}} Generations - {{package500_price}}₽",
+      "package1000": "{{package1000_count}} Generations - {{package1000_price}}₽",
+      "payment_prompt": "You selected: {{package}}\nPrice: {{price}}₽\nGenerations: {{count}}\n\nClick the button below to proceed to payment:",
+      "payment_confirm": "Confirm your purchase of {{package}}.\nPrice: {{price}}₽\nGenerations: {{count}}\n\nClick the button below to proceed to payment:",
+      "pay_button": "Pay Now"
+    },
+    "payments": {
+      "success": "🎉 <b>Payment Successful!</b>\n\nYour account has been credited with <b>{{count}}</b> generations worth <b>{{amount}}₽</b>.\n\nThank you for choosing our service! We appreciate your trust and are here to help you restore your precious memories."
+    },
+    "settings": {
+      "info": "⚙️ <b>Current Settings</b>\n\n• <b>Resolution:</b> {{resolution}} ({{width}}x{{height}})\n• <b>Use Negative Prompt:</b> {{useNegativePrompt}}\n• <b>Use Random Seed:</b> {{useSeed}}\n• <b>Batch Size:</b> {{batchSize}}\n• <b>Language:</b> {{language}}",
+      "change_resolution": "Change Resolution",
+      "change_seed": "Toggle Random Seed",
+      "change_batch": "Change Batch Size",
+      "change_language": "Change Language",
+      "random_seed": "Random",
+      "fixed_seed": "Fixed",
+      "resolution_updated": "Resolution updated to {{resolution}}",
+      "resolution_square": "Square (1:1)",
+      "resolution_vertical": "Vertical (2:3)",
+      "resolution_horizontal": "Horizontal (3:2)",
+      "batch_size_updated": "Batch size updated to {{batchSize}}",
+      "batch_size_info": "Select number of images to generate at once (current: {{current}})",
+      "choose_resolution": "Choose image resolution:",
+      "change_negative_prompt": "Toggle Negative Prompt",
+      "use_negative_prompt_enabled": "Enabled",
+      "use_negative_prompt_disabled": "Disabled",
+      "use_seed_enabled": "Enabled",
+      "use_seed_disabled": "Disabled",
+      "negative_prompt_updated": "Negative prompt setting updated to: {{state}}",
+      "seed_updated": "Seed setting updated to: {{state}}",
+      "cancelled": "Settings update cancelled.",
+      "language_info": "Choose your preferred language:",
+      "language_updated": "Language updated to: {{language}}",
+      "language_en": "English",
+      "language_ru": "Russian",
+      "keyboard_refreshed": "Your keyboard has been updated to match your language preference.",
+      "keyboard": {
+        "change_resolution": "Change Resolution",
+        "toggle_negative_prompt": "Toggle Negative Prompt",
+        "toggle_seed": "Toggle Random Seed",
+        "change_batch_size": "Change Batch Size",
+        "change_language": "Change Language"
+      },
+      "resolution": {
+        "square": "Square (1:1)",
+        "vertical": "Vertical (2:3)",
+        "horizontal": "Horizontal (3:2)",
+        "label": "Resolution"
+      },
+      "language_name": {
+        "ru": "Russian",
+        "en": "English"
+      },
+      "info_template": "⚙️ <b>Current Settings</b>\n\n• <b>{{resolution_label}}:</b> {{resolution}} ({{width}}x{{height}})\n• <b>{{negative_prompt_label}}:</b> {{useNegativePrompt}}\n• <b>{{random_seed_label}}:</b> {{useSeed}}\n• <b>{{batch_size_label}}:</b> {{batchSize}}\n• <b>{{language_label}}:</b> {{language}}",
+      "negative_prompt_label": "Negative Prompt",
+      "random_seed_label": "Random Seed",
+      "batch_size_label": "Batch Size",
+      "language_label": "Language"
+    },
+    "balance": {
+      "info": "Your balance:\n• Generations remaining: {{remainingGenerations}}\n• Referrals: {{referrals}}",
+      "subscription_active": "Active",
+      "subscription_inactive": "Inactive",
+      "subscription_end_date": "Subscription ends: {{date}}"
+    },
+    "links": {
+      "info": "🔗 <b>Useful Links</b>\n\n• <a href=\"https://12ai.ru/oferta\">Offer</a>\n• <a href=\"https://t.me/avato_memory_channel\">News channel</a>"
+    },
+    "upgrade": {
+      "user_not_found": "User not found. Please start the bot again with /start.",
+      "insufficient_balance": "You don't have enough balance to enhance the image. Image enhancement costs {{cost}} generations, but you only have {{balance}}.",
+      "no_images": "No images found to enhance. Please generate images first.",
+      "images_expired": "Images have expired or have been removed. Please create new images.",
+      "image_expired": "This image has expired or has been removed. Please create new images.",
+      "explanation": "Select a photo to increase its size. The photo will be increased in size by 2 times.\nCost - {{cost}} restorations per photo.",
+      "please_select": "I found <b>{{count}}</b> images from your previous restorations. Please select one to enhance.",
+      "select_image": "Select an image to enhance. Enhancement costs {{cost}} credits.",
+      "image_button": "⚪️ Image {{number}}",
+      "confirm_image": "You selected this image for enhancement. Do you want to proceed?\nOur advanced processing system will improve sharpness, colors, and details of your photo.\nCost - {{cost}} generations per photo.",
+      "confirm_button": "✅ Confirm and enhance",
+      "back_button": "⬅️ Choose another image",
+      "enhancing": "✨ Enhancing your image quality...",
+      "completed": "✨ Image enhancement complete!",
+      "processing": "🔄 Processing your image enhancement. This may take up to 3-5 minutes...",
+      "queued": "🔄 Your image enhancement has been queued.",
+      "processing_queued": "⏳ Your image enhancement request is queued. We'll notify you when your enhanced image is ready!",
+      "upgrade_error": "Error enhancing image. Your generation credit has been returned. Please try again later.",
+      "cancelled": "Image enhancement cancelled.",
+      "no_recent_generations": "No recent image generations found. Please generate images first.",
+      "no_images_found": "No valid images found for enhancement."
+    },
+    "subscription": {
+      "not_subscribed": "🙏🏻 You need to subscribe to our channels to use this bot. Please subscribe to all channels below, then click 'Check Subscription', then you can use free restorations.",
+      "check_button": "🔄 Check Subscription",
+      "check_again": "Please make sure you're subscribed to all required channels and try again.",
+      "all_subscribed": "✅ Thank you! You're subscribed to all required channels."
+    },
+    "keyboard": {
+      "restore": "✨ Restore",
+      "balance": "🏦 Balance",
+      "referral": "🫂 Referral",
+      "support_menu": "✨ Support"
+    },
+    "support_menu": {
+      "welcome": "✨ <b>Support Menu</b>\n\nSelect a section:",
+      "button_help": "📖 Help",
+      "button_links": "🔗 Links",
+      "button_settings": "⚙️ Settings",
+      "button_support": "👥 Support",
+      "button_back": "⬅️ Back"
+    }
+  },
+  "generation": {
+    "promptTooShort": "Prompt too short",
+    "notEnoughGenerations": "Not enough generations left",
+    "failed": "Generation failed",
+    "validCode": "Valid referral code",
+    "invalidCode": "Invalid referral code"
+  },
+  "payments": {
+    "plans": {
+      "monthly": {
+        "name": "Monthly Subscription",
+        "description": "Unlimited generations for 30 days"
+      },
+      "yearly": {
+        "name": "Yearly Subscription",
+        "description": "Unlimited generations for 365 days"
+      },
+      "pack10": {
+        "name": "10 Generations Pack",
+        "description": "10 image generations"
+      },
+      "pack50": {
+        "name": "50 Generations Pack",
+        "description": "50 image generations"
+      }
+    },
+    "paymentCreated": "Payment created",
+    "invalidPlan": "Invalid plan ID",
+    "paymentFailed": "Payment failed",
+    "paymentCompleted": "Payment completed"
+  },
+  "referrals": {
+    "stats": "Referral stats",
+    "count": "Referral count: {{count}}",
+    "code": "Your referral code: {{code}}",
+    "link": "Your referral link:",
+    "validCode": "Valid referral code",
+    "invalidCode": "Invalid referral code"
+  },
+  "admin": {
+    "accessDenied": "Access denied. Admin privileges required.",
+    "userNotFound": "User not found",
+    "userUpdated": "User updated",
+    "statsTitle": "System Statistics"
+  }
+} 
