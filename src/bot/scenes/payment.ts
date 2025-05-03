@@ -43,7 +43,7 @@ async function displayPaymentInfo(ctx: MyContext): Promise<void> {
   
   // Get state cast to proper type with default value
   const state = (ctx.scene.state || {}) as PaymentSceneState;
-  const packageType = state.packageType || 'package100';
+  const packageType = state.packageType || 'package1';
   
   // Get package details
   const packageDetails = GENERATION_PACKAGES[packageType];

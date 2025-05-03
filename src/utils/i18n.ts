@@ -22,21 +22,21 @@ export function translateWithPackages(
   const paramsWithPackages = {
     ...params,
     // Inject each package's details
-    package100_name: packagesConfig.package100.name,
-    package100_price: packagesConfig.package100.price,
-    package100_count: packagesConfig.package100.count,
+    package1_name: packagesConfig.package1.name,
+    package1_price: packagesConfig.package1.price,
+    package1_count: packagesConfig.package1.count,
     
-    package250_name: packagesConfig.package250.name,
-    package250_price: packagesConfig.package250.price,
-    package250_count: packagesConfig.package250.count,
+    package2_name: packagesConfig.package2.name,
+    package2_price: packagesConfig.package2.price,
+    package2_count: packagesConfig.package2.count,
     
-    package500_name: packagesConfig.package500.name,
-    package500_price: packagesConfig.package500.price,
-    package500_count: packagesConfig.package500.count,
+    package3_name: packagesConfig.package3.name,
+    package3_price: packagesConfig.package3.price,
+    package3_count: packagesConfig.package3.count,
     
-    package1000_name: packagesConfig.package1000.name,
-    package1000_price: packagesConfig.package1000.price,
-    package1000_count: packagesConfig.package1000.count,
+    package4_name: packagesConfig.package4.name,
+    package4_price: packagesConfig.package4.price,
+    package4_count: packagesConfig.package4.count,
   };
   
   return t(key, paramsWithPackages);

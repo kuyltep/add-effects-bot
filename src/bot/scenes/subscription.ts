@@ -32,12 +32,12 @@ async function displayPackages(ctx: MyContext): Promise<void> {
         parse_mode: 'HTML',
         reply_markup: Markup.inlineKeyboard([
           [
-            Markup.button.callback(translateWithPackages('bot:packages.package100', {}, ctx.i18n.t), 'package_package100'),
-            Markup.button.callback(translateWithPackages('bot:packages.package250', {}, ctx.i18n.t), 'package_package250'),
+            Markup.button.callback(translateWithPackages('bot:packages.package1', {}, ctx.i18n.t), 'package_package1'),
+            Markup.button.callback(translateWithPackages('bot:packages.package2', {}, ctx.i18n.t), 'package_package2'),
           ],
           [
-            Markup.button.callback(translateWithPackages('bot:packages.package500', {}, ctx.i18n.t), 'package_package500'),
-            Markup.button.callback(translateWithPackages('bot:packages.package1000', {}, ctx.i18n.t), 'package_package1000'),
+            Markup.button.callback(translateWithPackages('bot:packages.package3', {}, ctx.i18n.t), 'package_package3'),
+            Markup.button.callback(translateWithPackages('bot:packages.package4', {}, ctx.i18n.t), 'package_package4'),
           ],
         ]).reply_markup,
       }
@@ -58,7 +58,7 @@ packagesScene.enter(async (ctx) => {
 });
 
 // Handle package selection
-packagesScene.action(/package_(package1000|package500|package250|package100)/, async (ctx) => {
+packagesScene.action(/package_(package4|package3|package2|package1)/, async (ctx) => {
   try {
     await ctx.answerCbQuery();
     

@@ -116,10 +116,10 @@
     },
     "packages": {
       "intro": "🛒 <b>Generation Packages</b>\n\nYou currently have <b>{{remainingGenerations}}</b> generations.\n\nSelect a package to purchase more generations:",
-      "package100": "{{package100_count}} Generations - {{package100_price}}₽",
-      "package250": "{{package250_count}} Generations - {{package250_price}}₽",
-      "package500": "{{package500_count}} Generations - {{package500_price}}₽",
-      "package1000": "{{package1000_count}} Generations - {{package1000_price}}₽",
+      "package1": "{{package1_count}} Generations - {{package1_price}}₽",
+      "package2": "{{package2_count}} Generations - {{package2_price}}₽",
+      "package3": "{{package3_count}} Generations - {{package3_price}}₽",
+      "package4": "{{package4_count}} Generations - {{package4_price}}₽",
       "payment_prompt": "You selected: {{package}}\nPrice: {{price}}₽\nGenerations: {{count}}\n\nClick the button below to proceed to payment:",
       "payment_confirm": "Confirm your purchase of {{package}}.\nPrice: {{price}}₽\nGenerations: {{count}}\n\nClick the button below to proceed to payment:",
       "pay_button": "Pay Now"

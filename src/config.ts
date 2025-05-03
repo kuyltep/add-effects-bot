@@ -65,29 +65,29 @@ export const paymentConfig = {
 
 // Generation packages configuration
 export const packagesConfig = {
-  package100: {
-    name: process.env.PACKAGE_100_NAME || '100 Generations',
-    price: parseInt(process.env.PACKAGE_100_PRICE || '490', 10),
+  package1: {
+    name: process.env.PACKAGE_1_NAME || '100 Generations',
+    price: parseInt(process.env.PACKAGE_1_PRICE || '490', 10),
     type: 'package',
-    count: parseInt(process.env.PACKAGE_100_COUNT || '100', 10),
+    count: parseInt(process.env.PACKAGE_1_COUNT || '100', 10),
   },
-  package250: {
-    name: process.env.PACKAGE_250_NAME || '250 Generations',
-    price: parseInt(process.env.PACKAGE_250_PRICE || '990', 10),
+  package2: {
+    name: process.env.PACKAGE_2_NAME || '250 Generations',
+    price: parseInt(process.env.PACKAGE_2_PRICE || '990', 10),
     type: 'package',
-    count: parseInt(process.env.PACKAGE_250_COUNT || '250', 10),
+    count: parseInt(process.env.PACKAGE_2_COUNT || '250', 10),
   },
-  package500: {
-    name: process.env.PACKAGE_500_NAME || '500 Generations',
-    price: parseInt(process.env.PACKAGE_500_PRICE || '1790', 10),
+  package3: {
+    name: process.env.PACKAGE_3_NAME || '500 Generations',
+    price: parseInt(process.env.PACKAGE_3_PRICE || '1790', 10),
     type: 'package',
-    count: parseInt(process.env.PACKAGE_500_COUNT || '500', 10),
+    count: parseInt(process.env.PACKAGE_3_COUNT || '500', 10),
   },
-  package1000: {
-    name: process.env.PACKAGE_1000_NAME || '1000 Generations',
-    price: parseInt(process.env.PACKAGE_1000_PRICE || '2990', 10),
+  package4: {
+    name: process.env.PACKAGE_4_NAME || '1000 Generations',
+    price: parseInt(process.env.PACKAGE_4_PRICE || '2990', 10),
     type: 'package',
-    count: parseInt(process.env.PACKAGE_1000_COUNT || '1000', 10),
+    count: parseInt(process.env.PACKAGE_4_COUNT || '1000', 10),
   },
 };
 
