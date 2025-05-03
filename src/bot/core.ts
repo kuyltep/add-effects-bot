@@ -193,11 +193,6 @@ function setupRedisSubscriber() {
           await sendDocumentToUser(data);
           break;
 
-        case 'bot:crease_error_choice':
-          // Handle crease removal error choice
-          await sendCreaseErrorChoice(data);
-          break;
-
         case 'bot:payment_success':
           // Handle payment success notification
           await sendPaymentSuccessNotification(data);
@@ -261,46 +256,6 @@ async function sendVideoToUser(data) {
   }
 }
 
-// Function to send crease error choice to user
-async function sendCreaseErrorChoice(data) {
-  try {
-    const { chatId, text, buttons, jobData, messageId } = data;
-    
-    if (!chatId || !text || !buttons) {
-      console.error('Missing required data for sending crease error choice');
-      return;
-    }
-    
-    await bot.telegram.deleteMessage(chatId, messageId);
-    // Create inline keyboard from buttons
-    const inlineKeyboard = buttons.map(button => ({
-      text: button.text,
-      callback_data: button.callback_data
-    }));
-    
-    // Send message with inline keyboard
-    const sentMessage = await bot.telegram.sendMessage(chatId, text, {
-      parse_mode: 'HTML',
-      reply_markup: {
-        inline_keyboard: [inlineKeyboard]
-      }
-    });
-    
-    // Store jobData for access when the callback is triggered
-    if (jobData && jobData.generationId) {
-      // Use Redis to store this data temporarily
-      // This is important to handle callbacks with the necessary context
-      await redisConnection.set(
-        `crease_error:${jobData.generationId}`, 
-        JSON.stringify(jobData),
-        'EX',
-        3600 // expire after 1 hour
-      );
-    }
-  } catch (error) {
-    console.error('Error sending crease error choice:', error);
-  }
-}
 
 // Function to send document to user
 async function sendDocumentToUser(data) {
@@ -472,7 +427,7 @@ async function sendRestorationResults(data) {
         ],
         [
           Markup.button.callback(generateVideoText, 'generate_video'),
-          // Markup.button.callback(upgradeImageText, 'upgrade_image')
+          Markup.button.callback(upgradeImageText, 'upgrade_image')
         ]
       ]);
       
@@ -573,7 +528,7 @@ export function getMainKeyboard(locale: string = 'ru') {
   const lang = locale.toLowerCase().startsWith('ru') ? 'ru' : 'en';
   
   // Use i18next to get localized button texts
-  const restoreText = i18next.t('bot:keyboard.restore', { lng: lang });
+  const restoreText = i18next.t('bot:keyboard.generate', { lng: lang });
   const balanceText = i18next.t('bot:keyboard.balance', { lng: lang });
   const referralText = i18next.t('bot:keyboard.referral', { lng: lang });
   const supportMenuText = i18next.t('bot:keyboard.support_menu', { lng: lang });
@@ -595,7 +550,7 @@ export async function startBot() {
     
     // Command handlers
     bot.command('start', async (ctx) => await ctx.scene.enter('start'));
-    bot.command('restore', async (ctx) => await ctx.scene.enter('generate'));
+    bot.command('generate', async (ctx) => await ctx.scene.enter('generate'));
     bot.command('settings', async (ctx) => await ctx.scene.enter('settings'));
     bot.command('balance', async (ctx) => await ctx.scene.enter('balance'));
     bot.command('referral', async (ctx) => await ctx.scene.enter('referral'));
@@ -635,111 +590,13 @@ export async function startBot() {
       await ctx.scene.enter('packages');
     });
     
-    // Add callback handlers for crease error
-    bot.action(/retry_no_creases:(.+)/, async (ctx) => {
-      // Get the generation ID from the callback data
-      const generationId = ctx.match[1];
-      
-      try {
-        // Get job data from Redis
-        const jobDataString = await redisConnection.get(`crease_error:${generationId}`);
-        if (!jobDataString) {
-          return ctx.answerCbQuery('Error: Restoration data not found');
-        }
-        
-        const jobData = JSON.parse(jobDataString);
-        
-        // Delete the message with buttons
-        await ctx.deleteMessage();
-
-        const statusMessage = await ctx.reply(ctx.i18n.t('bot:generate.analyzingPrompt'), { 
-          parse_mode: 'HTML' 
-        });
-        
-        jobData.messageId = statusMessage.message_id;
-        jobData.isRetryWithoutCreases = true;
-        jobData.hasCreases = false; // Important: turn off crease processing for retry
-        const {addRestorationJob} = await import('../queues/generationQueue');
-        // Add to the restoration queue again
-        // Use the correct queue name for adding jobs directly via Redis
-        await addRestorationJob(jobData);
-
-        await prisma.user.update({
-          where: { id: jobData.userId },
-          data: {
-            remainingGenerations: {
-              decrement: parseInt(process.env.RESTORATION_COST || '1', 10)
-            }
-          }
-        });
-        // Clean up Redis data
-        await redisConnection.del(`crease_error:${generationId}`);
-      } catch (error) {
-        console.error('Error handling retry_no_creases callback:', error);
-        ctx.answerCbQuery('Error processing request');
-      }
-    });
-    
-    bot.action(/cancel_generation:(.+)/, async (ctx) => {
-      // Get the generation ID from the callback data
-      const generationId = ctx.match[1];
-      
-      try {
-        // Get job data from Redis
-        const jobDataString = await redisConnection.get(`crease_error:${generationId}`);
-        if (!jobDataString) {
-          return ctx.answerCbQuery('Error: Restoration data not found');
-        }
-        
-        const jobData = JSON.parse(jobDataString);
-        
-        // Delete the message with buttons
-        await ctx.deleteMessage();
-        
-        // Refund the user's generations
-        const RESTORATION_COST_HARD = parseInt(process.env.RESTORATION_COST_HARD || '3', 10);
-        
-        // Update user's balance
-        await prisma.user.update({
-          where: { id: jobData.userId },
-          data: {
-            remainingGenerations: {
-              increment: RESTORATION_COST_HARD
-            }
-          }
-        });
-        
-        // Update generation status to failed
-        if (generationId) {
-          await prisma.generation.update({
-            where: { id: generationId },
-            data: {
-              status: 'FAILED',
-              error: 'Crease removal unavailable, generation cancelled by user'
-            }
-          });
-        }
-        
-        // Send cancellation message
-        await ctx.reply(i18next.t('bot:generate.cancelled', { 
-          lng: jobData.language 
-        }));
-        
-        // Clean up Redis data
-        await redisConnection.del(`crease_error:${generationId}`);
-      } catch (error) {
-        console.error('Error handling cancel_generation callback:', error);
-        ctx.answerCbQuery('Error processing request');
-      }
-    });
-    
       await bot.launch();
 
     await bot.telegram.setMyCommands([
       { command: 'start', description: 'Start the bot' },
       { command: 'referral', description: 'Referral program' },
       { command: 'balance', description: 'Check your balance' },
-      { command: 'restore', description: 'Restore an old photo' },
+      { command: 'generate', description: 'Generate a new photo' },
       { command: 'settings', description: 'Bot settings' },
       { command: 'help', description: 'How to use the bot' },
       { command: 'packages', description: 'Buy restoration packages' },
