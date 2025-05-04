@@ -6,8 +6,6 @@ import fs from 'fs';
 // Track active workers
 const activeWorkers: Worker[] = [];
 
-// Track successful worker paths for future launches
-const successfulWorkerPaths: Record<string, string> = {};
 
 // Helper function to determine the correct script extension and path
 function getScriptPath(basePath: string): string {
@@ -51,166 +49,96 @@ function getScriptPath(basePath: string): string {
 
 // List of worker modules to launch in separate threads
 const workers = [
-  { name: 'generationWorker', script: '../queues/generationWorker' },
-  { name: 'upgradeWorker', script: '../queues/upgradeWorker' },
-  { name: 'videoWorker', script: '../queues/videoWorker' }
+  { name: 'imageEffectWorker', script: '../queues/imageEffectWorker' },
+  { name: 'videoWorker', script: '../queues/videoWorker' },
 ];
 
-// Function to find the correct worker script file
+// Function to find the correct worker script file (JS or TS)
 function findWorkerFile(basePath: string): string {
-  // Get absolute path without extension
   const basePathWithoutExt = basePath.replace(/\.(js|ts)$/, '');
   const resolvedBasePath = path.resolve(__dirname, basePathWithoutExt);
-  
-  // Try JavaScript file first (production build)
   const jsPath = `${resolvedBasePath}.js`;
-  if (fs.existsSync(jsPath)) {
-    return jsPath;
-  }
-  
-  // Fall back to TypeScript file (development mode)
+  if (fs.existsSync(jsPath)) return jsPath;
   const tsPath = `${resolvedBasePath}.ts`;
-  if (fs.existsSync(tsPath)) {
-    return tsPath;
-  }
-  
-  // If neither exists, return the JS path and let the worker creation handle the error
-  return jsPath;
+  if (fs.existsSync(tsPath)) return tsPath;
+  Logger.warn(`Worker script not found for base path: ${basePath}. Trying .js path.`, { jsPath });
+  return jsPath; // Default to JS path if neither found
 }
 
 // Function to start a worker in its own thread
 function startWorker(workerData: { name: string, script: string }) {
   try {
-    // Find the correct worker file (JS or TS)
     const workerPath = findWorkerFile(workerData.script);
-    console.log(`Starting worker ${workerData.name} using: ${workerPath}`);
+    Logger.info(`Starting worker ${workerData.name} using: ${workerPath}`);
     
-    // Create the worker
     const worker = new Worker(workerPath, {
       workerData: { workerName: workerData.name }
     });
     
-    // Store the worker reference
     activeWorkers.push(worker);
 
-    // Handle worker events
-    worker.on('online', () => {
-      console.log(`Worker ${workerData.name} is online`);
-    });
-
-    worker.on('message', (message) => {
-      console.log(`Message from ${workerData.name}:`, message);
-    });
-
+    worker.on('online', () => Logger.info(`Worker ${workerData.name} is online`));
+    worker.on('message', (message) => Logger.info(`Message from ${workerData.name}:`, { message }));
     worker.on('error', (error) => {
-      Logger.error(error, {
-        context: 'worker-threads',
-        worker: workerData.name
-      });
-      console.error(`Error in ${workerData.name}:`, error);
-      // Restart the worker on error
-      setTimeout(() => startWorker(workerData), 5000);
+      Logger.error(error, { context: 'worker-thread', worker: workerData.name });
+      // Consider a restart strategy with backoff
     });
-
     worker.on('exit', (code) => {
-      if (code !== 0) {
-        Logger.error(`Worker ${workerData.name} exited with code ${code}`, {
-          context: 'worker-threads',
-          worker: workerData.name,
-          exitCode: code
-        });
-        console.error(`Worker ${workerData.name} exited with code ${code}`);
-        // Restart the worker if it crashed
-        setTimeout(() => startWorker(workerData), 5000);
-      }
-
-      // Remove worker from active workers
       const index = activeWorkers.indexOf(worker);
-      if (index > -1) {
-        activeWorkers.splice(index, 1);
+      if (index > -1) activeWorkers.splice(index, 1);
+      if (code !== 0) {
+        Logger.error(`Worker ${workerData.name} exited`, { code, worker: workerData.name });
+        // Consider restarting
+      } else {
+        Logger.info(`Worker ${workerData.name} exited gracefully.`);
       }
     });
-
     return worker;
   } catch (error) {
-    Logger.error(error, {
-      context: 'worker-threads',
-      worker: workerData.name
-    });
-    console.error(`Failed to start worker ${workerData.name}:`, error);
-    
-    // Try to restart the worker
-    setTimeout(() => startWorker(workerData), 5000);
+    Logger.error(error, { context: 'worker-thread-start', worker: workerData.name });
     return null;
   }
 }
 
 // Start all workers
 export function launchWorkers() {
-  console.log('Launching workers in separate threads...');
-  
-  workers.forEach(worker => {
-    startWorker(worker);
-  });
-  
-  console.log('All workers launched');
+  Logger.info('Launching workers...');
+  workers.forEach(startWorker);
+  Logger.info(`${workers.length} workers launched.`);
 }
 
 // Gracefully stop all workers
 export async function stopWorkers(): Promise<boolean> {
-  console.log('Shutting down workers...');
-  
+  Logger.info('Shutting down workers...');
   let success = true;
-  
-  // Send shutdown message to all workers and wait for them to terminate
   const shutdownPromises = activeWorkers.map(worker => {
     return new Promise<void>((resolve) => {
-      // Set up a one-time exit handler to know when the worker is done
-      worker.once('exit', () => {
-        resolve();
-      });
-      
-      // Send shutdown message
-      worker.postMessage({ type: 'shutdown' });
-      
-      // Set a timeout to force termination if graceful shutdown fails
+      worker.once('exit', () => resolve());
+      worker.postMessage({ type: 'shutdown' }); // Signal worker to shutdown
       setTimeout(() => {
-        try {
-          worker.terminate();
-          console.log('Worker terminated forcefully');
-        } catch (error) {
-          console.error('Error terminating worker:', error);
-          success = false;
-        } finally {
+        worker.terminate().then(() => {
+          Logger.warn(`Worker terminated forcefully after timeout.`);
           resolve();
-        }
-      }, 5000); // 5 second timeout for graceful shutdown
+        }).catch(err => {
+          Logger.error('Error during forceful termination', { err });
+          success = false;
+          resolve(); // Still resolve to not block shutdown
+        });
+      }, 5000);
     });
   });
-  
-  // Wait for all workers to exit
+
   if (shutdownPromises.length > 0) {
     await Promise.all(shutdownPromises);
   }
-  
-  console.log(`All workers shut down ${success ? 'successfully' : 'with some errors'}`);
+  Logger.info(`All workers shut down ${success ? 'successfully' : 'with some issues'}.`);
+  activeWorkers.length = 0; // Clear the array
   return success;
 }
 
-// Handle graceful shutdown
-process.on('SIGINT', () => {
-  console.log('Shutting down workers...');
-  stopWorkers().then(() => {
-    process.exit(0);
-  });
-});
-
-process.on('SIGTERM', () => {
-  console.log('Shutting down workers...');
-  stopWorkers().then(() => {
-    process.exit(0);
-  });
-});
+// Optional: Handle main process signals for graceful shutdown
+// process.on('SIGINT', async () => { await stopWorkers(); process.exit(0); });
+// process.on('SIGTERM', async () => { await stopWorkers(); process.exit(0); });
 
 // Start workers if this file is run directly
 if (require.main === module) {
