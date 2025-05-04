@@ -8,7 +8,6 @@ import { createRedisConnection, createRedisPublisher } from '../utils/redis';
 import i18next from '../i18n';
 import { updateRestorationStatus } from '../services/restoration';
 import { RestorationJob } from '../types/generation';
-import { removeCreases, restoreOldPhoto, colorizePhoto } from '../services/replicate';
 import { Logger } from '../utils/rollbar.logger';
 import fetch from 'node-fetch';
 import { isMainThread, parentPort, workerData } from 'worker_threads';
@@ -324,46 +323,46 @@ async function processPhoto(photoPath: string, hasCreases: boolean): Promise<str
   try {
     let processedPath = photoPath;
     
-    // Step 1: Remove creases if needed
-    if (hasCreases) {
-      try {
-        console.log(`Starting crease removal for ${photoPath}`);
-        const creaselessPath = await removeCreases(processedPath);
-        processedPath = creaselessPath;
-      } catch (creaseError) {
-        // Track the crease removal error in a special job property
-        throw {
-          type: 'CREASE_REMOVAL_ERROR',
-          originalPath: photoPath,
-          message: creaseError.message || 'Error in crease removal step'
-        };
-      }
-    }
+    // // Step 1: Remove creases if needed
+    // if (hasCreases) {
+    //   try {
+    //     console.log(`Starting crease removal for ${photoPath}`);
+    //     const creaselessPath = await removeCreases(processedPath);
+    //     processedPath = creaselessPath;
+    //   } catch (creaseError) {
+    //     // Track the crease removal error in a special job property
+    //     throw {
+    //       type: 'CREASE_REMOVAL_ERROR',
+    //       originalPath: photoPath,
+    //       message: creaseError.message || 'Error in crease removal step'
+    //     };
+    //   }
+    // }
     
-    // Step 2: Restore old photo
-    console.log(`Starting photo restoration for ${processedPath}`);
-    const restoredPath = await restoreOldPhoto(processedPath);
+    // // Step 2: Restore old photo
+    // console.log(`Starting photo restoration for ${processedPath}`);
+    // const restoredPath = await restoreOldPhoto(processedPath);
     
-    // If photo restoration returned a path, use it
-    if (typeof restoredPath === 'string') {
-      processedPath = restoredPath;
-      console.log(`Photo restoration successful: ${processedPath}`);
-    } else {
-      throw new Error('Photo restoration did not return a valid path');
-    }
+    // // If photo restoration returned a path, use it
+    // if (typeof restoredPath === 'string') {
+    //   processedPath = restoredPath;
+    //   console.log(`Photo restoration successful: ${processedPath}`);
+    // } else {
+    //   throw new Error('Photo restoration did not return a valid path');
+    // }
 
     
-    // Step 3: Colorize photo
-    console.log(`Starting photo colorization for ${processedPath}`);
-    const colorizedPath = await colorizePhoto(processedPath);
+    // // Step 3: Colorize photo
+    // console.log(`Starting photo colorization for ${processedPath}`);
+    // const colorizedPath = await colorizePhoto(processedPath);
     
-    // If colorization returned a path, use it
-    if (typeof colorizedPath === 'string') {
-      processedPath = colorizedPath;
-      console.log(`Photo colorization successful: ${processedPath}`);
-    } else {
-      throw new Error('Photo colorization did not return a valid path');
-    }
+    // // If colorization returned a path, use it
+    // if (typeof colorizedPath === 'string') {
+    //   processedPath = colorizedPath;
+    //   console.log(`Photo colorization successful: ${processedPath}`);
+    // } else {
+    //   throw new Error('Photo colorization did not return a valid path');
+    // }
 
     const timestampFolder = Date.now().toString();
     const finalPath = await saveImageLocally(

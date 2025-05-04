@@ -3,7 +3,10 @@ import fs from 'fs';
 import path from 'path';
 import sharp from 'sharp';
 import { prisma } from '../utils/prisma';
-import { MyContext, GenerateWizardState } from '../types';
+import config from '../config';
+import { v4 as uuidv4 } from 'uuid';
+import { MyContext, GenerateWizardState, GenerationResponse } from '../types';
+import  {  addRestorationJob } from '../queues/generationQueue';
 import { Logger } from '../utils/rollbar.logger';
 
 /**
@@ -37,25 +40,19 @@ export interface GeneratedImage {
 }
 
 
+// Initialize directories
+initializeDirectories();
 
 /**
- * Initialize the Reve SDK client
+ * Ensure necessary directories exist
  */
-
-
-
-
-
-
-
-/**
- * Ensure a directory exists
- */
-function ensureDirectoryExists(directory: string) {
-  if (!fs.existsSync(directory)) {
-    fs.mkdirSync(directory, { recursive: true });
+function initializeDirectories() {
+  const uploadsDir = config.server.uploadDir;
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
   }
 }
+
 
 /**
  * Extract base64 data from image URL
@@ -112,7 +109,7 @@ async function createWatermarkLogo(size: number): Promise<Buffer> {
         fill="white" 
         text-anchor="middle" 
         alignment-baseline="middle">
-        Reve AI
+        AI Image
       </text>
     </svg>
   `;
@@ -190,6 +187,7 @@ export function ensureUploadDirectory(telegramId: string): string {
  * Interface for generation record parameters
  */
 interface GenerationRecordParams {
+  generationId: string;
   userId: string;
   prompt: string;
   negativePrompt: string;
@@ -211,6 +209,7 @@ interface GenerationRecordParams {
  */
 export async function createGenerationRecord(params: GenerationRecordParams): Promise<any> {
   const { 
+    generationId, 
     userId, 
     prompt, 
     negativePrompt, 
@@ -230,6 +229,7 @@ export async function createGenerationRecord(params: GenerationRecordParams): Pr
   
   return prisma.generation.create({
     data: {
+      id: generationId,
       userId,
       prompt,
       negativePrompt: negativePrompt || '',
@@ -279,6 +279,39 @@ export async function decrementGenerationCount(userId: string): Promise<any> {
     where: { id: userId },
     data: { remainingGenerations: { decrement: 1 } }
   });
+}
+
+/**
+ * Updates status message with queue position
+ * @param ctx The Telegraf context
+ * @param chatId The chat ID
+ * @param messageId The message ID to update
+ * @param createdAt Creation time of the generation
+ */
+export async function updateQueueMessage(
+  ctx: MyContext,
+  chatId: number,
+  messageId: number,
+  createdAt: Date
+): Promise<void> {
+  // Count pending jobs ahead of this one
+  const pendingCount = await prisma.generation.count({
+    where: { 
+      status: GenerationStatus.PENDING,
+      createdAt: { lt: createdAt }
+    }
+  });
+
+  // Update message to show queue position
+  await ctx.telegram.editMessageText(
+    chatId,
+    messageId,
+    undefined,
+    ctx.i18n.t('bot:generate.queued', {
+      position: pendingCount + 1
+    }),
+    { parse_mode: 'HTML' }
+  );
 }
 
 /**
@@ -337,16 +370,18 @@ export async function processGeneration(ctx: MyContext): Promise<void> {
 
     try {
       // Generate a unique restoration ID
+      const generationId = uuidv4();
       
       // Verify we have a photo to restore
       if (!hasPhoto || !fileId) {
         await ctx.reply(ctx.i18n.t('bot:generate.no_photo'));
         return;
       }
-      let generationId;
+      
       // Create a restoration record in the database
       if (userId) {
-        const generation = await createGenerationRecord({
+        await createGenerationRecord({
+          generationId,
           userId,
           prompt: 'Photo Restoration',
           negativePrompt: '',
@@ -359,9 +394,8 @@ export async function processGeneration(ctx: MyContext): Promise<void> {
           messageId: statusMessage.message_id,
           status: GenerationStatus.PENDING
         });
-        generationId = generation.id;
       }
-      const  {addRestorationJob}=await import('../queues/generationQueue')
+
       // Add job to restoration queue
       await addRestorationJob({
         userId,
@@ -415,7 +449,7 @@ export async function canUserGenerate(ctx: MyContext, user: any): Promise<boolea
   if (user.remainingGenerations <= 0 && !user.subscriptionActive) {
     await ctx.reply(
       ctx.i18n.t('bot:generate.no_generations_left', {
-        link: `https://t.me/reve_art_bot?start=${user.referralCode}`,
+        link: `https://t.me/${process.env.BOT_USERNAME}?start=${user.referralCode}`,
       }),
       {
         parse_mode: 'HTML',
@@ -433,7 +467,6 @@ export async function canUserGenerate(ctx: MyContext, user: any): Promise<boolea
   }
   return true;
 }
-
 
 
 
