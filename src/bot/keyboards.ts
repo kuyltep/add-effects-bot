@@ -8,14 +8,12 @@ export function getMainKeyboard(locale: string = 'ru') {
   
   return Markup.keyboard([
     [
-      Markup.button.text(i18next.t('bot:menu.generate', { lng: currentLocale })),
-      Markup.button.text(i18next.t('bot:menu.balance', { lng: currentLocale }))
+      Markup.button.text(i18next.t('bot:keyboard.generate', { lng: currentLocale })),
+      Markup.button.text(i18next.t('bot:keyboard.balance', { lng: currentLocale }))
     ],
     [
-      Markup.button.text(i18next.t('bot:menu.subscription', { lng: currentLocale })),
-      Markup.button.text(i18next.t('bot:menu.referral', { lng: currentLocale })),
-      Markup.button.text(i18next.t('bot:menu.settings', { lng: currentLocale }))
+      Markup.button.text(i18next.t('bot:keyboard.referral', { lng: currentLocale })),
+      Markup.button.text(i18next.t('bot:keyboard.support_menu', { lng: currentLocale }))
     ],
-    [Markup.button.text(i18next.t('bot:menu.help', { lng: currentLocale }))]
   ]).resize();
 } 

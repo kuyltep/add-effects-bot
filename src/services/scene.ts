@@ -132,14 +132,32 @@ export async function initializeWizardState(
 }
 
 /**
- * Exits scene with specified message
+ * Exits scene with specified message and resets keyboard
  */
 export async function exitScene(
   ctx: MyContext, 
-  messageKey: string = 'errors.cancelled'
+  messageKey?: string
 ): Promise<any> {
-  // await ctx.reply(ctx.i18n.t(messageKey));
-  return await ctx.scene.leave();
+  try {
+    // Answer callback query if it exists
+    if (ctx.callbackQuery) {
+      await ctx.answerCbQuery()
+    }
+    
+    // If message key is provided, send an exit message
+    if (messageKey) {
+      await ctx.reply(ctx.i18n.t(messageKey), {
+        parse_mode: 'HTML',
+      });
+    }
+    
+    // Leave the scene
+    return await ctx.scene.leave();
+  } catch (error) {
+    // If an error occurs, still try to leave the scene
+    console.error('Error in exitScene:', error);
+    return await ctx.scene.leave();
+  }
 }
 
 /**
