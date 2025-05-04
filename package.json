@@ -41,7 +41,6 @@
     "openai": "^4.89.0",
     "prisma": "^6.5.0",
     "replicate": "^1.0.1",
-    "reve-sdk": "0.3.1",
     "rollbar": "^2.26.4",
     "sharp": "^0.34.1",
     "telegraf": "^4.16.3",
@@ -53,6 +52,7 @@
   "devDependencies": {
     "@types/jsonwebtoken": "^9.0.9",
     "@types/uuid": "^10.0.0",
+    "madge": "^8.0.0",
     "prettier": "^3.2.4",
     "typescript-transpile-only": "^0.0.4"
   }

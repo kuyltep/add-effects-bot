@@ -90,8 +90,6 @@ model UserSettings {
   updatedAt         DateTime   @updatedAt
 }
 
-
-
 enum Role {
   USER
   ADMIN
