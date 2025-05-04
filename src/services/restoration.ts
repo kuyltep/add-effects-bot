@@ -1,13 +1,8 @@
 import path from 'path';
 import fs from 'fs';
-import { v4 as uuidv4 } from 'uuid';
 import { prisma } from '../utils/prisma';
-import { Generation, GenerationStatus } from '@prisma/client';
-import { createRedisConnection } from '../utils/redis';
+import { GenerationStatus } from '@prisma/client';
 import { Logger } from '../utils/rollbar.logger';
-
-// Initialize Redis client using the shared connection function
-const redisClient = createRedisConnection();
 
 /**
  * Parameters for photo restoration

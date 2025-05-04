@@ -4,11 +4,9 @@ import { v4 as uuidv4 } from 'uuid';
 import { publishMessage, publishBatch } from '../utils/redis';
 import { prisma } from '../utils/prisma';
 import { GenerationStatus } from '@prisma/client';
-import { Logger } from '../utils/rollbar.logger';
 import { readFile} from "fs/promises";
 import { fal } from "@fal-ai/client";
 import path from "path";
-import { s3Storage } from '../utils/s3Storage';
 
 // Log token first few chars for debugging
 
