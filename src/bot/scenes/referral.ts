@@ -1,8 +1,8 @@
-import { Scenes } from 'telegraf';
+import { Scenes, Markup } from 'telegraf';
 import { findUserByTelegramId } from '../../services/user';
 import { prisma } from '../../utils/prisma';
-import { MyContext } from '../../types/bot';
-import { getMainKeyboard } from '../core';
+import { MyContext } from '../types';
+import { getMainKeyboard } from '../keyboards';
 import { handleSceneError, exitScene, createReferralLink } from '../../services/scene';
 
 // Create the referral scene

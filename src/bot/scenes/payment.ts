@@ -1,7 +1,8 @@
 import { Markup, Scenes } from 'telegraf';
 import { findUserByTelegramId } from '../../services/user';
-import { MyContext } from '../../types/bot';
-import { getMainKeyboard } from '../core';
+import { MyContext } from '../types';
+import { getMainKeyboard } from '../keyboards';
+// import { getPackagesKeyboard } from '../keyboards'; // Removed incorrect import
 import { GenerationPackageType } from '../../services/payment';
 import { GENERATION_PACKAGES, createPackagePayment } from '../../services/payment';
 import { handleSceneError, exitScene } from '../../services/scene';

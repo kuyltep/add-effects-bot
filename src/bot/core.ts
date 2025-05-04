@@ -494,52 +494,62 @@ async function sendPaymentSuccessNotification(data: {
 }
 
 export async function stopBot() {
-  console.log('Stopping Telegram bot...');
-  try {
-    // Close the Redis subscriber connection
-    if (redisSubscriber) {
+  console.log('Stopping bot...');
+  // Ensure Redis subscriber exists before trying to unsubscribe and quit
+  if (redisSubscriber) {
+    try {
+      await redisSubscriber.unsubscribe();
       await redisSubscriber.quit();
-      console.log('Bot Redis subscriber closed');
+      console.log('Redis subscriber disconnected');
+    } catch (error) {
+      console.error('Error disconnecting Redis subscriber:', error);
     }
-    
-    // Close the Redis publisher connection
-    if (redisPublisher) {
-      await redisPublisher.quit();
-      console.log('Bot Redis publisher closed');
-    }
-    
-    // Close the Redis connection
-    if (redisConnection) {
-      await redisConnection.quit();
-      console.log('Bot Redis connection closed');
-    }
-    
-    // Stop the bot
-    bot.stop();
-    console.log('Telegram bot stopped successfully');
-  } catch (error) {
-    console.error('Error stopping Telegram bot:', error);
   }
+
+  // Ensure Redis publisher exists before trying to quit
+  if (redisPublisher) {
+    try {
+      await redisPublisher.quit();
+      console.log('Redis publisher disconnected');
+    } catch (error) {
+      console.error('Error disconnecting Redis publisher:', error);
+    }
+  }
+
+  // Ensure Redis connection exists before trying to quit
+  if (redisConnection) {
+    try {
+      await redisConnection.quit();
+      console.log('Redis connection disconnected');
+    } catch (error) {
+      console.error('Error disconnecting Redis connection:', error);
+    }
+  }
+
+  // Stop the bot instance
+  bot.stop();
+  console.log('Bot stopped.');
 }
 
-// Функция для получения основной клавиатуры
-// No longer pre-created to allow dynamic language fetching
-export function getMainKeyboard(locale: string = 'ru') {
-  const lang = locale.toLowerCase().startsWith('ru') ? 'ru' : 'en';
+// Function to generate the main keyboard layout based on locale
+// export function getMainKeyboard(locale: string = 'ru') {
+//   // Ensure locale exists in i18next resources
+//   const currentLocale = i18next.exists(locale) ? locale : 'ru';
   
-  // Use i18next to get localized button texts
-  const restoreText = i18next.t('bot:keyboard.generate', { lng: lang });
-  const balanceText = i18next.t('bot:keyboard.balance', { lng: lang });
-  const referralText = i18next.t('bot:keyboard.referral', { lng: lang });
-  const supportMenuText = i18next.t('bot:keyboard.support_menu', { lng: lang });
-  
-  return Markup.keyboard([
-    [restoreText, balanceText],
-    [referralText, supportMenuText],
-  ]).resize();
-}
+//   return Markup.keyboard([
+//     [
+//       Markup.button.text(i18next.t('bot:menu.generate', { lng: currentLocale })),
+//       Markup.button.text(i18next.t('bot:menu.balance', { lng: currentLocale }))
+//     ],
+//     [
+//       Markup.button.text(i18next.t('bot:menu.subscription', { lng: currentLocale })),
+//       Markup.button.text(i18next.t('bot:menu.referral', { lng: currentLocale })),
+//       Markup.button.text(i18next.t('bot:menu.settings', { lng: currentLocale }))
+//     ],
+//     [Markup.button.text(i18next.t('bot:menu.help', { lng: currentLocale }))]
+//   ]).resize();
+// }
 
-// Функция запуска бота
 export async function startBot() {
   try {
     // Initialize Redis clients

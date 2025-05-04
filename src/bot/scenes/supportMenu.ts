@@ -1,6 +1,7 @@
 import { Composer, Markup, Scenes } from 'telegraf';
-import { MyContext } from '../../types/bot';
-import { getMainKeyboard } from '../core'; // Импортируем для кнопки "Назад"
+import { getMainKeyboard } from '../keyboards'; // Импортируем для кнопки "Назад"
+import { MyContext } from '../types';
+import { handleSceneError, exitScene } from '../../services/scene';
 
 // Клавиатура для меню помощи
 function getSupportMenuKeyboard(ctx: MyContext) {

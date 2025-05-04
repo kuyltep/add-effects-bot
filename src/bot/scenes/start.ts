@@ -1,11 +1,10 @@
 import { Scenes } from 'telegraf';
 import { findUserByTelegramId, createUser } from '../../services/user';
-import { getMainKeyboard } from '../core';
+import { getMainKeyboard } from '../keyboards';
 import { MyContext } from '../../types/bot';
 import { processReferralCode } from '../../services/referral';
 import { getStartParameter, createReferralLink } from '../../services/scene';
 import { TelegramUserInfo } from '../../types/user.type';
-import { Logger } from '../../utils/rollbar.logger';
 
 /**
  * Extract user information from context

@@ -9,12 +9,11 @@ import {
   createLanguageKeyboard,
   formatSettingsInfo
 } from '../../services/settings';
-import { MyContext } from '../../types/bot';
+import { MyContext } from '../types';
 import { prisma } from '../../utils/prisma';
 import { SettingsWizardState } from '../../types/bot';
 import { Resolution, SettingsAction } from '../../types/bot';
 import { Language } from '@prisma/client';
-import { getMainKeyboard } from '../core';
 import { Logger } from '../../utils/rollbar.logger';
 
 // Create the settings scene

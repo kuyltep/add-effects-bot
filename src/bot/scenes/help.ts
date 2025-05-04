@@ -1,6 +1,6 @@
 import { Scenes } from 'telegraf';
-import { MyContext } from '../../types/bot';
-import { getMainKeyboard } from '../core';
+import { getMainKeyboard } from '../keyboards';
+import { MyContext } from '../types';
 import { handleSceneError, exitScene } from '../../services/scene';
 
 // Create the help scene
