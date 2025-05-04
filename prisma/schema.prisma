@@ -32,6 +32,8 @@ model User {
   isBanned             Boolean       @default(false)
   banReason            String?
   bannedAt             DateTime?
+  isSubscribed         Boolean       @default(false)
+  freeGenerationsGranted Boolean   @default(false)
 }
 
 model Referral {
