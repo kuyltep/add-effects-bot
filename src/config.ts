@@ -35,17 +35,6 @@ export const botConfig = {
   botUsername: process.env.BOT_USERNAME || '',
 };
 
-// Reve AI configuration
-export const reveConfig = {
-  auth: process.env.REVE_AUTH || '',
-  cookie: process.env.REVE_COOKIE || '',
-  projectId: process.env.REVE_PROJECT_ID || '',
-  defaultModel: 'text2image_v1/prod/20250325-2246',
-  timeout: 60000,
-  pollingInterval: 2000,
-  maxPollingAttempts: 60,
-};
-
 // OpenAI configuration
 export const openaiConfig = {
   apiKey: process.env.OPENAI_API_KEY || '',
@@ -110,7 +99,7 @@ export const defaultGenerationSettings = {
   height: 768,
   randomSeed: true,
   batchSize: 1,
-  model: 'rev3',
+  model: 'v1',
 };
 
 export default {
@@ -118,7 +107,6 @@ export default {
   db: dbConfig,
   redis: redisConfig,
   bot: botConfig,
-  reve: reveConfig,
   openai: openaiConfig,
   payment: paymentConfig,
   packages: packagesConfig,
