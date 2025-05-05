@@ -96,7 +96,7 @@ export interface SettingsWizardState {
 }
 
 // Define the possible effect types
-export type EffectType = 'claymation' | 'ghibli' | 'pixar';
+export type EffectType = 'claymation' | 'ghibli' | 'pixar' | 'plushify' | 'ghiblify' | 'cartoonify';
 
 /**
  * Data specific to the generation process

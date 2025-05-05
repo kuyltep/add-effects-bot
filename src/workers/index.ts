@@ -70,7 +70,6 @@ function findWorkerFile(basePath: string): string {
 function startWorker(workerData: { name: string, script: string }) {
   try {
     const workerPath = findWorkerFile(workerData.script);
-    Logger.info(`Starting worker ${workerData.name} using: ${workerPath}`);
     
     const worker = new Worker(workerPath, {
       workerData: { workerName: workerData.name }
@@ -90,9 +89,7 @@ function startWorker(workerData: { name: string, script: string }) {
       if (code !== 0) {
         Logger.error(`Worker ${workerData.name} exited`, { code, worker: workerData.name });
         // Consider restarting
-      } else {
-        Logger.info(`Worker ${workerData.name} exited gracefully.`);
-      }
+      } 
     });
     return worker;
   } catch (error) {
@@ -103,14 +100,11 @@ function startWorker(workerData: { name: string, script: string }) {
 
 // Start all workers
 export function launchWorkers() {
-  Logger.info('Launching workers...');
   workers.forEach(startWorker);
-  Logger.info(`${workers.length} workers launched.`);
 }
 
 // Gracefully stop all workers
 export async function stopWorkers(): Promise<boolean> {
-  Logger.info('Shutting down workers...');
   let success = true;
   const shutdownPromises = activeWorkers.map(worker => {
     return new Promise<void>((resolve) => {
@@ -132,7 +126,6 @@ export async function stopWorkers(): Promise<boolean> {
   if (shutdownPromises.length > 0) {
     await Promise.all(shutdownPromises);
   }
-  Logger.info(`All workers shut down ${success ? 'successfully' : 'with some issues'}.`);
   activeWorkers.length = 0; // Clear the array
   return success;
 }

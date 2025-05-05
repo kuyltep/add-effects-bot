@@ -87,6 +87,7 @@ export interface VideoSceneState {
   selectedImagePath?: string;
   prompt?: string;
   selectedEffect?: string;
+  waitingForPrompt?: boolean;
 }
 
 /**
