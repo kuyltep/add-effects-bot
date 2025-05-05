@@ -1,13 +1,12 @@
-import { GenerationStatus } from '@prisma/client';
+import { GenerationStatus,  User } from '@prisma/client';
 import fs from 'fs';
 import path from 'path';
-import sharp from 'sharp';
 import { prisma } from '../utils/prisma';
 import config from '../config';
 import { v4 as uuidv4 } from 'uuid';
-import { MyContext, GenerateWizardState, GenerationResponse } from '../types';
-import  {  addRestorationJob } from '../queues/generationQueue';
+import { MyContext, EffectType } from '../types';
 import { Logger } from '../utils/rollbar.logger';
+import { addImageEffectJob, ImageEffectJobData } from '../queues/imageEffectQueue';
 
 /**
  * Interface for image generation parameters
@@ -39,7 +38,6 @@ export interface GeneratedImage {
   size: number;
 }
 
-
 // Initialize directories
 initializeDirectories();
 
@@ -53,70 +51,6 @@ function initializeDirectories() {
   }
 }
 
-
-/**
- * Extract base64 data from image URL
- */
-function extractBase64Data(base64Image: string): string {
-  return base64Image.includes('base64,')
-    ? base64Image.split('base64,')[1]
-    : base64Image;
-}
-
-/**
- * Apply watermark to an image
- * Places a 100x100px watermark in the right bottom corner of the image
- */
-async function applyWatermark(imageBuffer: Buffer): Promise<Buffer> {
-  try {
-    const image = sharp(imageBuffer);
-    
-    // Create watermark logo
-    const logoSize = 100; // 100x100 pixels
-    const logoBuffer = await createWatermarkLogo(logoSize);
-    
-    // Apply watermark to bottom right corner with 10px padding
-    return await image
-      .composite([
-        {
-          input: logoBuffer,
-          gravity: 'southeast', // bottom-right corner
-          left: 10, 
-          top: 10,
-        },
-      ])
-      .toBuffer();
-  } catch (error) {
-    // Return original buffer if watermarking fails
-    return imageBuffer;
-  }
-}
-
-/**
- * Create a watermark logo image
- */
-async function createWatermarkLogo(size: number): Promise<Buffer> {
-  // Create a simple watermark with the text and transparent background
-  const svg = `
-    <svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
-      <rect width="100%" height="100%" fill="rgba(0,0,0,0.4)" rx="10" ry="10" />
-      <text 
-        x="50%" 
-        y="50%" 
-        font-family="Arial, sans-serif" 
-        font-weight="bold"
-        font-size="14" 
-        fill="white" 
-        text-anchor="middle" 
-        alignment-baseline="middle">
-        AI Image
-      </text>
-    </svg>
-  `;
-  
-  return await sharp(Buffer.from(svg)).resize(size, size).toBuffer();
-}
-
 /**
  * Validates if the prompt meets minimum requirements
  * @param prompt The user's prompt text
@@ -126,48 +60,6 @@ export function isValidPrompt(prompt: string): boolean {
   return prompt.length >= 3;
 }
 
-/**
- * Validates and parses seed input
- * @param input The seed input string
- * @returns The parsed seed value (-1 for random)
- */
-export function parseSeedInput(input: string): number {
-  if (input.toLowerCase() === 'random' || input.toLowerCase() === 'skip') {
-    return -1;
-  }
-  
-  const seedNumber = parseInt(input);
-  if (isNaN(seedNumber) || seedNumber <= 0) {
-    throw new Error('invalid_seed');
-  }
-  
-  return seedNumber;
-}
-
-/**
- * Validates batch size input
- * @param input The batch size input string
- * @returns The parsed batch size value
- */
-export function validateBatchSize(input: string): number {
-  const batchSize = parseInt(input);
-  if (isNaN(batchSize) || batchSize < 1 || batchSize > 4) {
-    throw new Error('invalid_batch_size');
-  }
-  return batchSize;
-}
-
-/**
- * Formats generation settings for display
- * @param ctx The Telegraf context
- * @param state The wizard state
- * @returns Formatted message string
- */
-export function formatGenerationSettings(ctx: MyContext, state: GenerateWizardState): string {
-  return ctx.i18n.t('bot:generate.processing', {
-    prompt: state.generationData.prompt,
-  });
-}
 
 /**
  * Creates and ensures upload directory exists
@@ -184,287 +76,90 @@ export function ensureUploadDirectory(telegramId: string): string {
 }
 
 /**
- * Interface for generation record parameters
+ * Interface for generation record parameters (simplified for queueing)
  */
 interface GenerationRecordParams {
   generationId: string;
   userId: string;
-  prompt: string;
-  negativePrompt: string;
-  seed: number;
-  width: number;
-  height: number;
-  batchSize: number;
-  model: string;
+  prompt: string; // Prompt might be added later or be effect name
+  effect: EffectType; // Store the selected effect
   chatId: string;
   messageId: number;
-  translatedPrompt?: string;
   status?: GenerationStatus;
-  imageUrls?: string[];
-  error?: string;
 }
 
 /**
- * Creates generation record in database
+ * Queues a new image effect generation job.
+ * 
+ * @param data - Data required for the image effect generation
+ * @returns The job instance
  */
-export async function createGenerationRecord(params: GenerationRecordParams): Promise<any> {
-  const { 
-    generationId, 
-    userId, 
-    prompt, 
-    negativePrompt, 
-    seed, 
-    width, 
-    height, 
-    batchSize, 
-    model, 
-    chatId, 
-    messageId,
-    status = GenerationStatus.PENDING,
-    imageUrls = [],
-    error = null
-  } = params;
-  
-  const finalSeed = seed === -1 ? Math.floor(Math.random() * 2147483647) : seed;
-  
-  return prisma.generation.create({
-    data: {
-      id: generationId,
-      userId,
-      prompt,
-      negativePrompt: negativePrompt || '',
-      seed: finalSeed,
-      width,
-      height,
-      batchSize,
-      model,
-      status,
-      chatId,
-      messageId,
-      imageUrls,
-      error
-    }
-  });
-}
-
-/**
- * Updates generation status in database
- */
-export async function updateGenerationStatus(
-  generationId: string, 
-  status: GenerationStatus, 
-  imageUrls: string[] = [],
-  error: string = null
-): Promise<any> {
-  const updateData: any = {
-    status,
-    imageUrls,
-    error
-  };
-  
-
-  
-  return prisma.generation.update({
-    where: { id: generationId },
-    data: updateData
-  });
-}
-
-/**
- * Decrements user's generation count if not subscribed
- * Returns the updated user record
- */
-export async function decrementGenerationCount(userId: string): Promise<any> {
-  return prisma.user.update({
-    where: { id: userId },
-    data: { remainingGenerations: { decrement: 1 } }
-  });
-}
-
-/**
- * Updates status message with queue position
- * @param ctx The Telegraf context
- * @param chatId The chat ID
- * @param messageId The message ID to update
- * @param createdAt Creation time of the generation
- */
-export async function updateQueueMessage(
-  ctx: MyContext,
-  chatId: number,
-  messageId: number,
-  createdAt: Date
-): Promise<void> {
-  // Count pending jobs ahead of this one
-  const pendingCount = await prisma.generation.count({
-    where: { 
-      status: GenerationStatus.PENDING,
-      createdAt: { lt: createdAt }
-    }
-  });
-
-  // Update message to show queue position
-  await ctx.telegram.editMessageText(
-    chatId,
-    messageId,
-    undefined,
-    ctx.i18n.t('bot:generate.queued', {
-      position: pendingCount + 1
-    }),
-    { parse_mode: 'HTML' }
-  );
-}
-
-/**
- * Sends remaining generations info
- * @param ctx The Telegraf context
- * @param remainingGenerations The number of remaining generations
- */
-export async function sendRemainingGenerationsInfo(
-  ctx: MyContext, 
-  remainingGenerations: number
-): Promise<void> {
-  await ctx.reply(
-    ctx.i18n.t('bot:generate.remainingGenerations', {
-      count: remainingGenerations,
-    }),
-    {
-      parse_mode: 'HTML',
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: ctx.i18n.t('bot:buttons.generate_more'), callback_data: 'generate_more' }
-          ],
-          [
-            { text: ctx.i18n.t('bot:buttons.invite_friend'), callback_data: 'invite_friend' }
-          ]
-        ]
-      }
-    }
-  );
-}
-
-/**
- * Main function to process photo restoration request
- * @param ctx The Telegraf context
- */
-export async function processGeneration(ctx: MyContext): Promise<void> {
+export async function queueImageGenerationJob(data: Omit<ImageEffectJobData, 'generationId'> & { generationId?: string }) {
   try {
-    // Get restoration parameters from state
-    const state = ctx.wizard.state as GenerateWizardState;
-    const {
-      telegramId,
-      userId,
-      language,
-      fileId,
-      hasPhoto,
-      hasCreases
-    } = state.generationData;
-
-    // Send analyzing message
-    const statusMessage = await ctx.reply(ctx.i18n.t('bot:generate.analyzingPrompt'), { 
-      parse_mode: 'HTML' 
-    });
-
-    // Ensure upload directory exists
-    ensureUploadDirectory(telegramId);
-
-    try {
-      // Generate a unique restoration ID
-      const generationId = uuidv4();
-      
-      // Verify we have a photo to restore
-      if (!hasPhoto || !fileId) {
-        await ctx.reply(ctx.i18n.t('bot:generate.no_photo'));
-        return;
+    // Generate a new ID if not provided
+    const generationId = data.generationId || uuidv4();
+    
+    // Create a generation record
+    await prisma.generation.create({
+      data: {
+        id: generationId,
+        userId: data.userId,
+        prompt: `Effect: ${data.effect}`, // Use effect name as prompt
+        seed: Math.floor(Math.random() * 2147483647), // Random seed
+        status: GenerationStatus.PENDING,
+        chatId: data.chatId,
+        messageId: data.messageId
       }
-      
-      // Create a restoration record in the database
-      if (userId) {
-        await createGenerationRecord({
-          generationId,
-          userId,
-          prompt: 'Photo Restoration',
-          negativePrompt: '',
-          seed: -1,
-          width: 1024,
-          height: 1024,
-          batchSize: 1,
-          model: 'restoration',
-          chatId: ctx.chat?.id?.toString() || '',
-          messageId: statusMessage.message_id,
-          status: GenerationStatus.PENDING
-        });
-      }
-
-      // Add job to restoration queue
-      await addRestorationJob({
-        userId,
-        fileId: fileId,
-        hasCreases: Boolean(hasCreases),
-        chatId: ctx.chat?.id?.toString() || '',
-        messageId: statusMessage.message_id,
-        language,
-        generationId
-      });
-      
-      // Return from function without waiting for completion
-      return;
-    } catch (error) {
-      // Handle queue error
-      Logger.error(error, { 
-        context: 'restoration-service', 
-        method: 'processGeneration',
-        telegramId 
-      });
-      
-      await ctx.reply(ctx.i18n.t('bot:generate.error', {
-        lng: language,
-        supportUsername: process.env.TELEGRAM_SUPPORT_USERNAME || 'avato_memory_help_bot'
-      }), { 
-        parse_mode: 'HTML' 
-      });
-    }
-  } catch (error) {
-    // Handle overall error
-    Logger.error(error, { 
-      context: 'restoration-service', 
-      method: 'processGeneration' 
     });
     
-    await ctx.reply(ctx.i18n.t('bot:generate.error', {
-      supportUsername: process.env.TELEGRAM_SUPPORT_USERNAME || 'avato_memory_help_bot'
-    }), { 
-      parse_mode: 'HTML' 
+    // Queue the job
+    const jobData: ImageEffectJobData = {
+      ...data,
+      generationId
+    };
+    
+    const job = await addImageEffectJob(jobData);
+    return job;
+  } catch (error) {
+    Logger.error(`Error queueing image effect job: ${error.message}`, { 
+      userId: data.userId, 
+      fileId: data.fileId,
+      effect: data.effect
     });
+    throw error;
   }
 }
 
 /**
- * Checks if user has enough restorations
- * @param ctx The Telegraf context
- * @param user The user object
- * @returns Boolean indicating if the user can restore
+ * Checks if a user can generate images.
+ * Returns false if not enough generations, not enough time passed, etc.
+ * 
+ * @param ctx - Telegram context
+ * @param userData - User data
+ * @returns boolean indicating if the user can generate
  */
-export async function canUserGenerate(ctx: MyContext, user: any): Promise<boolean> {
-  if (user.remainingGenerations <= 0 && !user.subscriptionActive) {
-    await ctx.reply(
-      ctx.i18n.t('bot:generate.no_generations_left', {
-        link: `https://t.me/${process.env.BOT_USERNAME}?start=${user.referralCode}`,
-      }),
-      {
-        parse_mode: 'HTML',
-        reply_markup: {
-          inline_keyboard: [
-            [
-              { text: ctx.i18n.t('bot:buttons.invite_friend'), callback_data: 'invite_friend' },
-              { text: ctx.i18n.t('bot:buttons.buy_generations'), callback_data: 'buy_generations' }
-            ]
-          ]
-        }
-      }
-    );
+export async function canUserGenerate(ctx: MyContext, userData: Pick<User, 'id' | 'remainingGenerations' | 'subscriptionActive'>): Promise<boolean> {
+  // Check if the user has remaining generations
+  if (userData.remainingGenerations <= 0 && !userData.subscriptionActive) {
+    await ctx.reply(ctx.i18n.t('bot:generate.no_generations_left'));
     return false;
   }
+  
+  // Check for ongoing generations
+  const ongoingGenerations = await prisma.generation.count({
+    where: {
+      userId: userData.id,
+      status: {
+        in: [GenerationStatus.PENDING, GenerationStatus.PROCESSING]
+      }
+    }
+  });
+  
+  if (ongoingGenerations >= 3) {
+    await ctx.reply(ctx.i18n.t('bot:generate.too_many_ongoing'));
+    return false;
+  }
+  
   return true;
 }
 

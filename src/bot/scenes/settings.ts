@@ -5,14 +5,13 @@ import {
   getResolutionDimensions,
   createSettingsKeyboard,
   createResolutionKeyboard,
-  createBatchSizeKeyboard,
   createLanguageKeyboard,
   formatSettingsInfo
 } from '../../services/settings';
 import { MyContext } from '../types';
 import { prisma } from '../../utils/prisma';
 import { SettingsWizardState } from '../../types/bot';
-import { Resolution, SettingsAction } from '../../types/bot';
+import { Resolution } from '../../types/bot';
 import { Language } from '@prisma/client';
 import { Logger } from '../../utils/rollbar.logger';
 
@@ -38,12 +37,11 @@ export const settingsScene = new Scenes.WizardScene<MyContext>(
   },
   // Step 2: Handle option selection
   handleSettingsOption,
-  // Step 3: Handle submenus (resolution, batch size, language)
+  // Step 3: Handle submenus (resolution, language)
   new Composer<MyContext>()
     .action('square', ctx => handleResolutionChange(ctx, 'SQUARE'))
     .action('vertical', ctx => handleResolutionChange(ctx, 'VERTICAL'))
     .action('horizontal', ctx => handleResolutionChange(ctx, 'HORIZONTAL'))
-    .action(/batch_([1-4])/, handleBatchSizeChange)
     .action(/lang_(EN|RU)/, handleLanguageChange)
 );
 
@@ -68,6 +66,9 @@ settingsScene.hears(/^\/[a-z]+/, async (ctx) => {
   console.log(`Exiting settings scene due to command ${ctx.message.text}`);
   return ctx.scene.leave();
 });
+
+// Handle main keyboard button clicks
+
 
 // Initialize user data
 async function initializeSettingsData(ctx: MyContext): Promise<SettingsWizardState | null> {
@@ -110,7 +111,7 @@ async function handleMainSettingsMenu(ctx: MyContext, state: SettingsWizardState
     formatSettingsInfo(ctx.i18n.locale, settings, dimensions),
     {
       parse_mode: 'HTML',
-      reply_markup: createSettingsKeyboard(ctx.i18n.locale),
+      reply_markup: createSettingsKeyboard(ctx.i18n.locale).reply_markup,
     }
   );
   
@@ -125,25 +126,15 @@ async function handleSettingsOption(ctx: MyContext): Promise<any> {
   }
   
   const callbackData = (ctx.callbackQuery as any).data;
-
   
   await ctx.answerCbQuery();
   
   const state = getWizardState(ctx);
   if (!state) return exitWithError(ctx);
   
-  const userId = state.settingsData.userId;
-  const settings = await getOrCreateUserSettings(userId);
-  
-  switch (callbackData as SettingsAction) {
+  switch (callbackData) {
     case 'change_resolution':
       return handleChangeResolution(ctx);
-    case 'toggle_negative_prompt':
-      return handleToggleNegativePrompt(ctx, userId, settings);
-    case 'toggle_seed':
-      return handleToggleSeed(ctx, userId, settings);
-    case 'change_batch_size':
-      return handleChangeBatchSize(ctx);
     case 'change_language':
       return handleChangeLanguage(ctx);
     default:
@@ -176,49 +167,10 @@ async function handleResolutionChange(ctx: MyContext, resolution: Resolution) {
   );
   
   // Get current settings with updated resolution
-  const settings = await getOrCreateUserSettings(state.settingsData.userId);
-  const dimensions = getResolutionDimensions(settings.resolution);
   
   // Show updated settings menu without leaving the scene
-  await ctx.reply(
-    formatSettingsInfo(ctx.i18n.locale, settings, dimensions),
-    {
-      parse_mode: 'HTML',
-      reply_markup: createSettingsKeyboard(ctx.i18n.locale),
-    }
-  );
-}
-
-// Batch size change
-async function handleBatchSizeChange(ctx: MyContext & { match?: RegExpExecArray }) {
-  if (!ctx.callbackQuery || !ctx.match?.[1]) return exitWithError(ctx);
-  
-  await ctx.answerCbQuery();
-  const state = getWizardState(ctx);
-  if (!state) return exitWithError(ctx);
-  
-  // Update batch size
-  const batchSize = parseInt(ctx.match[1], 10);
-  
-  await updateUserSettings(state.settingsData.userId, { batchSize });
-  
-  // Send confirmation
-  await ctx.reply(ctx.i18n.t('bot:settings.batch_size_updated', { batchSize }), {
-    parse_mode: 'HTML',
-  });
-  
-  // Get current settings with updated batch size
-  const settings = await getOrCreateUserSettings(state.settingsData.userId);
-  const dimensions = getResolutionDimensions(settings.resolution);
-  
-  // Show updated settings menu without leaving the scene
-  await ctx.reply(
-    formatSettingsInfo(ctx.i18n.locale, settings, dimensions),
-    {
-      parse_mode: 'HTML',
-      reply_markup: createSettingsKeyboard(ctx.i18n.locale),
-    }
-  );
+  await ctx.scene.leave();
+  return ctx.scene.enter('settings');
 }
 
 // Language change
@@ -257,7 +209,7 @@ async function handleLanguageChange(ctx: MyContext & { match?: RegExpExecArray }
     formatSettingsInfo(ctx.i18n.locale, settings, dimensions),
     {
       parse_mode: 'HTML',
-      reply_markup: createSettingsKeyboard(ctx.i18n.locale),
+      reply_markup: createSettingsKeyboard(ctx.i18n.locale).reply_markup,
     }
   );
 }
@@ -266,88 +218,8 @@ async function handleLanguageChange(ctx: MyContext & { match?: RegExpExecArray }
 async function handleChangeResolution(ctx: MyContext) {
   await ctx.reply(ctx.i18n.t('bot:settings.choose_resolution'), {
     parse_mode: 'HTML',
-    reply_markup: createResolutionKeyboard(ctx.i18n.locale),
+    reply_markup: createResolutionKeyboard(ctx.i18n.locale).reply_markup,
   });
-  return ctx.wizard.next();
-}
-
-// Toggle negative prompt
-async function handleToggleNegativePrompt(ctx: MyContext, userId: string, settings: any) {
-  // Toggle the value
-  const newValue = !settings.useNegativePrompt;
-  
-  
-  await updateUserSettings(userId, { useNegativePrompt: newValue });
-  
-  // Send confirmation
-  await ctx.reply(
-    ctx.i18n.t('bot:settings.negative_prompt_updated', {
-      state: newValue
-        ? ctx.i18n.t('bot:settings.use_negative_prompt_enabled')
-        : ctx.i18n.t('bot:settings.use_negative_prompt_disabled'),
-    }),
-    { parse_mode: 'HTML' }
-  );
-  
-  // Get updated settings
-  const updatedSettings = await getOrCreateUserSettings(userId);
-  const dimensions = getResolutionDimensions(updatedSettings.resolution);
-  
-  // Show updated settings menu without leaving the scene
-  await ctx.reply(
-    formatSettingsInfo(ctx.i18n.locale, updatedSettings, dimensions),
-    {
-      parse_mode: 'HTML',
-      reply_markup: createSettingsKeyboard(ctx.i18n.locale),
-    }
-  );
-}
-
-// Toggle seed
-async function handleToggleSeed(ctx: MyContext, userId: string, settings: any) {
-  // Toggle the value
-  const newValue = !settings.useSeed;
-  
-  await updateUserSettings(userId, { useSeed: newValue });
-  
-  // Send confirmation
-  await ctx.reply(
-    ctx.i18n.t('bot:settings.seed_updated', {
-      state: newValue
-        ? ctx.i18n.t('bot:settings.use_seed_enabled')
-        : ctx.i18n.t('bot:settings.use_seed_disabled'),
-    }),
-    { parse_mode: 'HTML' }
-  );
-  
-  // Get updated settings
-  const updatedSettings = await getOrCreateUserSettings(userId);
-  const dimensions = getResolutionDimensions(updatedSettings.resolution);
-  
-  // Show updated settings menu without leaving the scene
-  await ctx.reply(
-    formatSettingsInfo(ctx.i18n.locale, updatedSettings, dimensions),
-    {
-      parse_mode: 'HTML',
-      reply_markup: createSettingsKeyboard(ctx.i18n.locale),
-    }
-  );
-}
-
-// Show batch size options
-async function handleChangeBatchSize(ctx: MyContext) {
-  const state = getWizardState(ctx);
-  if (!state) return exitWithError(ctx);
-  
-  const settings = await getOrCreateUserSettings(state.settingsData.userId);
-  
-  await ctx.reply(
-    ctx.i18n.t('bot:settings.batch_size_info', { current: settings.batchSize }), 
-    {
-      parse_mode: 'HTML',
-      reply_markup: createBatchSizeKeyboard(),
-    }
-  );
   return ctx.wizard.next();
 }
 
@@ -357,7 +229,7 @@ async function handleChangeLanguage(ctx: MyContext) {
     ctx.i18n.t('bot:settings.language_info'), 
     {
       parse_mode: 'HTML',
-      reply_markup: createLanguageKeyboard(),
+      reply_markup: createLanguageKeyboard().reply_markup,
     }
   );
   return ctx.wizard.next();
