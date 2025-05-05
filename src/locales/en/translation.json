@@ -73,8 +73,8 @@
       "effect_ghibli": "🌸 Ghibli Anime",
       "effect_pixar": "🧩 Pixar Style",
       "effect_plushify": "🧸 Plush Toy",
-      "effect_early_ghibli": "🏯 Early Ghibli",
-      "effect_3d_cartoon": "🎬 3D Cartoon",
+      "effect_ghiblify": "🏯 Early Ghibli",
+      "effect_cartoonify": "🎬 3D Cartoon",
       "send_photo_for_effect": "🖼️ Great! Now, please send the image you want to transform.",
       "processing_queued": "⏳ Your request is queued! The AI is warming up... We'll notify you when your masterpiece is ready.",
       "queue_error": "❌ Sorry, there was an issue adding your request to the queue. Please try again."
@@ -85,6 +85,9 @@
       "no_images": "No images found to create a video from. Please generate images first.",
       "images_expired": "Images have expired or have been removed. Please create new images.",
       "image_expired": "This image has expired or has been removed. Please create new images.",
+      "prompt_instructions": "Enter your prompt describing how the video should look, or use our default prompt.\n\nVideo generation costs {{cost}} generations.",
+      "use_default_prompt": "Use Default Prompt",
+      "cancel_button": "Cancel",
       "enter_prompt": "Now enter a prompt describing how you want the video to look and move. Be detailed!",
       "processing": "⏳ Generating your video... This may take up to 1-2 minutes.",
       "completed": "🎬 Your video is ready!",
@@ -140,7 +143,7 @@
       "success": "🎉 <b>Payment Successful!</b>\n\nYour account has been credited with <b>{{count}}</b> generations worth <b>{{amount}}₽</b>.\n\nThank you for choosing our service! We appreciate your trust and are here to help you restore your precious memories."
     },
     "settings": {
-      "info": "⚙️ <b>Current Settings</b>\n\n• <b>Resolution:</b> {{resolution}} ({{width}}x{{height}})\n• <b>Use Negative Prompt:</b> {{useNegativePrompt}}\n• <b>Use Random Seed:</b> {{useSeed}}\n• <b>Batch Size:</b> {{batchSize}}\n• <b>Language:</b> {{language}}",
+      "info": "⚙️ <b>Current Settings</b>\n\n• <b>Resolution:</b> {{resolution}} ({{width}}x{{height}})\n",
       "change_resolution": "Change Resolution",
       "change_seed": "Toggle Random Seed",
       "change_batch": "Change Batch Size",
@@ -185,10 +188,7 @@
         "ru": "Russian",
         "en": "English"
       },
-      "info_template": "⚙️ <b>Current Settings</b>\n\n• <b>{{resolution_label}}:</b> {{resolution}} ({{width}}x{{height}})\n• <b>{{negative_prompt_label}}:</b> {{useNegativePrompt}}\n• <b>{{random_seed_label}}:</b> {{useSeed}}\n• <b>{{batch_size_label}}:</b> {{batchSize}}\n• <b>{{language_label}}:</b> {{language}}",
-      "negative_prompt_label": "Negative Prompt",
-      "random_seed_label": "Random Seed",
-      "batch_size_label": "Batch Size",
+      "info_template": "⚙️ <b>Current Settings</b>\n\n• <b>{{resolution_label}}:</b> {{resolution}} ({{width}}x{{height}})\n• <b>{{language_label}}:</b> {{language}}",
       "language_label": "Language"
     },
     "balance": {
