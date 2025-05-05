@@ -100,11 +100,11 @@ function setupRedisSubscriber() {
     'bot:status_update',
     'bot:delete_message',
     'bot:download_file',
-    'bot:send_restoration',
     'bot:send_video',
     'bot:send_document',
     'bot:crease_error_choice',
-    'bot:payment_success'
+    'bot:payment_success',
+    'bot:send_effect'
   );
   
   // Handle messages
@@ -177,11 +177,6 @@ function setupRedisSubscriber() {
             console.error('Error downloading file:', error);
           }
           break;
-        
-        case 'bot:send_restoration':
-          // Send restoration results to user
-          await sendRestorationResults(data);
-          break;
           
         case 'bot:send_video':
           // Send video to user
@@ -196,6 +191,11 @@ function setupRedisSubscriber() {
         case 'bot:payment_success':
           // Handle payment success notification
           await sendPaymentSuccessNotification(data);
+          break;
+          
+        case 'bot:send_effect':
+          // Send effect results to user
+          await sendEffectResults(data);
           break;
       }
     } catch (error) {
@@ -302,21 +302,65 @@ async function sendDocumentToUser(data) {
   }
 }
 
-// Function to send restoration results via bot
-async function sendRestorationResults(data) {
+// Function to send payment success notification to user
+async function sendPaymentSuccessNotification(data: { 
+  telegramId: string;
+  generationsAdded: number;
+  amount: number;
+}) {
+  try {
+    if (!data.telegramId) {
+      console.error('Missing telegramId in payment success data');
+      return;
+    }
+
+    // Get user with settings to determine language
+    const user = await prisma.user.findFirst({
+      where: { telegramId: data.telegramId },
+      include: { settings: true }
+    });
+    
+    // Default to Russian if no language preference found
+    const language = user?.settings?.language?.toLowerCase() || 'ru';
+    
+    // Send payment success message
+    await bot.telegram.sendMessage(
+      data.telegramId,
+      i18next.t('bot:payments.success', { 
+        lng: language,
+        count: data.generationsAdded,
+        amount: data.amount
+      }),
+      { 
+        parse_mode: 'HTML',
+        reply_markup: Markup.inlineKeyboard([
+          [Markup.button.callback(i18next.t('bot:buttons.generate_now', { lng: language }), 'generate_more')]
+        ]).reply_markup
+      }
+    );
+    
+    console.log(`Payment success notification sent to user ${data.telegramId}`);
+  } catch (error) {
+    console.error('Error sending payment success notification:', error);
+  }
+}
+
+// Function to send effect results via bot
+async function sendEffectResults(data) {
   const chatId = data?.chatId;
   const { 
     imageData,
     userId,
     language,
     referralCode,
-    generationId
+    generationId,
+    effect
   } = data;
   try {
 
     
     if (!chatId || !imageData) {
-      console.error('Missing chatId or imageData in restoration results data');
+      console.error('Missing chatId or imageData in effect results data');
       return;
     }
 
@@ -337,8 +381,8 @@ async function sendRestorationResults(data) {
       referralCode
     });
     
-    // Send the restored image with caption
-    console.log(`Sending restored image to chat ${chatId}: ${imagePath} (isUrl: ${isUrl})`);
+    // Send the effect image with caption
+    console.log(`Sending effect image to chat ${chatId}: ${imagePath} (isUrl: ${isUrl})`);
     
     try {
       if (isUrl) {
@@ -368,7 +412,7 @@ async function sendRestorationResults(data) {
       console.error('Error sending photo:', photoError);
       await bot.telegram.sendMessage(
         chatId,
-        'Could not send the restored photo, but the restoration was completed. Please try again.',
+        'Could not send the processed photo, but the effect was applied. Please try again.',
         { parse_mode: 'HTML' }
       );
     }
@@ -434,7 +478,7 @@ async function sendRestorationResults(data) {
       await bot.telegram.sendMessage(chatId, remainingGenerationsText, keyboard);
     }
   } catch (error) {
-    console.error('Error sending restoration results:', error);
+    console.error('Error sending effect results:', error);
     try {
       if (chatId) {
         // Send error message as fallback
@@ -447,49 +491,6 @@ async function sendRestorationResults(data) {
     } catch (sendError) {
       console.error('Failed to send error message:', sendError);
     }
-  }
-}
-
-// Function to send payment success notification to user
-async function sendPaymentSuccessNotification(data: { 
-  telegramId: string;
-  generationsAdded: number;
-  amount: number;
-}) {
-  try {
-    if (!data.telegramId) {
-      console.error('Missing telegramId in payment success data');
-      return;
-    }
-
-    // Get user with settings to determine language
-    const user = await prisma.user.findFirst({
-      where: { telegramId: data.telegramId },
-      include: { settings: true }
-    });
-    
-    // Default to Russian if no language preference found
-    const language = user?.settings?.language?.toLowerCase() || 'ru';
-    
-    // Send payment success message
-    await bot.telegram.sendMessage(
-      data.telegramId,
-      i18next.t('bot:payments.success', { 
-        lng: language,
-        count: data.generationsAdded,
-        amount: data.amount
-      }),
-      { 
-        parse_mode: 'HTML',
-        reply_markup: Markup.inlineKeyboard([
-          [Markup.button.callback(i18next.t('bot:buttons.generate_now', { lng: language }), 'generate_more')]
-        ]).reply_markup
-      }
-    );
-    
-    console.log(`Payment success notification sent to user ${data.telegramId}`);
-  } catch (error) {
-    console.error('Error sending payment success notification:', error);
   }
 }
 

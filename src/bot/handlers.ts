@@ -174,6 +174,7 @@ export function setupKeyboardHandlers() {
       balance: 'bot:keyboard.balance',
       referral: 'bot:keyboard.referral',
       supportMenu: 'bot:keyboard.support_menu',
+      settings: 'bot:keyboard.settings',
     };
 
     let targetScene: string | null = null;

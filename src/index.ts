@@ -278,7 +278,6 @@ async function shutdownServices() {
   }
   
   if (shutdownSuccessful) {
-    Logger.info('All services shut down successfully');
     console.log('All services shut down successfully');
   } else {
     Logger.warn('Some services encountered errors during shutdown');
