@@ -37,31 +37,19 @@ export async function getUserSettings(userId: string): Promise<UserSettings | nu
  * @returns Настройки пользователя
  */
 export async function getOrCreateUserSettings(userId: string): Promise<UserSettings> {
-  try {
-    // Проверяем существующие настройки
-    let settings = await prisma.userSettings.findUnique({
-      where: { userId },
-    });
-
-    // Если настроек нет, создаем их со значениями по умолчанию
-    if (!settings) {
-      settings = await prisma.userSettings.create({
-        data: {
-          userId,
-          useNegativePrompt: true,
-          useSeed: false,
-          batchSize: 1,
-          resolution: 'SQUARE' as Resolution,
-          model: 'rev3',
-        },
-      });
+  const settings = await prisma.userSettings.findUnique({
+    where: { userId }
+  });
+  
+  if (settings) return settings;
+  
+  return prisma.userSettings.create({
+    data: {
+      userId,
+      resolution: 'SQUARE',
+      language: 'RU',
     }
-
-    return settings;
-  } catch (error) {
-    Logger.error(error, { context: 'settings-service', method: 'getOrCreateUserSettings' });
-    throw error;
-  }
+  });
 }
 
 /**
@@ -70,31 +58,11 @@ export async function getOrCreateUserSettings(userId: string): Promise<UserSetti
  * @param data Данные для обновления
  * @returns Обновленные настройки пользователя
  */
-export async function updateUserSettings(
-  userId: string,
-  data: {
-    useNegativePrompt?: boolean;
-    useSeed?: boolean;
-    batchSize?: number;
-    resolution?: Resolution;
-    model?: string;
-    language?: Language;
-  }
-) {
-  try {
-    // Убеждаемся, что настройки существуют
-    await getOrCreateUserSettings(userId);
-
-    // Обновляем настройки
-    const settings = await prisma.userSettings.update({
-      where: { userId },
-      data,
-    });
-    return settings;
-  } catch (error) {
-    Logger.error('Error updating user settings:', error);
-    throw error;
-  }
+export async function updateUserSettings(userId: string, data: any) {
+  return prisma.userSettings.update({
+    where: { userId },
+    data
+  });
 }
 
 /**
@@ -119,14 +87,13 @@ export function getResolutionDimensions(resolution: Resolution): ResolutionDimen
  * @returns Объект клавиатуры Telegraf Markup.
  */
 export function createSettingsKeyboard(locale: string) {
-  const lang = locale.toLowerCase().startsWith('ru') ? 'ru' : 'en';
   return Markup.inlineKeyboard([
-    [Markup.button.callback(i18next.t('bot:settings.keyboard.change_resolution', { lng: lang }), 'change_resolution')],
-    [Markup.button.callback(i18next.t('bot:settings.keyboard.toggle_negative_prompt', { lng: lang }), 'toggle_negative_prompt')],
-    [Markup.button.callback(i18next.t('bot:settings.keyboard.toggle_seed', { lng: lang }), 'toggle_seed')],
-    [Markup.button.callback(i18next.t('bot:settings.keyboard.change_batch_size', { lng: lang }), 'change_batch_size')],
-    [Markup.button.callback(i18next.t('bot:settings.keyboard.change_language', { lng: lang }), 'change_language')],
-  ]).reply_markup;
+    [Markup.button.callback(
+      i18next.t('bot:settings.change_resolution', { lng: locale }),
+      'change_resolution'
+    )],
+
+  ]);
 }
 
 /**
@@ -135,40 +102,32 @@ export function createSettingsKeyboard(locale: string) {
  * @returns Объект клавиатуры Telegraf Markup.
  */
 export function createResolutionKeyboard(locale: string) {
-  const lang = locale.toLowerCase().startsWith('ru') ? 'ru' : 'en';
   return Markup.inlineKeyboard([
-    [Markup.button.callback(i18next.t('bot:settings.resolution.square', { lng: lang }), 'square')],
-    [Markup.button.callback(i18next.t('bot:settings.resolution.vertical', { lng: lang }), 'vertical')],
-    [Markup.button.callback(i18next.t('bot:settings.resolution.horizontal', { lng: lang }), 'horizontal')],
-  ]).reply_markup;
+    [Markup.button.callback(
+      i18next.t('bot:settings.resolution_square', { lng: locale }),
+      'square'
+    )],
+    [Markup.button.callback(
+      i18next.t('bot:settings.resolution_vertical', { lng: locale }),
+      'vertical'
+    )],
+    [Markup.button.callback(
+      i18next.t('bot:settings.resolution_horizontal', { lng: locale }),
+      'horizontal'
+    )]
+  ]);
 }
 
-/**
- * Создает клавиатуру для выбора размера пакета.
- * @returns Объект клавиатуры Telegraf Markup.
- */
-export function createBatchSizeKeyboard() {
-  // Кнопки с числами не требуют локализации
-  return Markup.inlineKeyboard([
-    [Markup.button.callback('1', 'batch_1')],
-    [Markup.button.callback('2', 'batch_2')],
-    [Markup.button.callback('3', 'batch_3')],
-    [Markup.button.callback('4', 'batch_4')],
-  ]).reply_markup;
-}
 
 /**
  * Создает клавиатуру для выбора языка.
  * @returns Объект клавиатуры Telegraf Markup.
  */
 export function createLanguageKeyboard() {
-  // Используем ключи для названий языков
   return Markup.inlineKeyboard([
-    [
-      Markup.button.callback(i18next.t('bot:settings.language_name.en', { lng: 'en' }), 'lang_EN'), // Всегда показываем 'English'
-      Markup.button.callback(i18next.t('bot:settings.language_name.ru', { lng: 'ru' }), 'lang_RU')  // Всегда показываем 'Русский'
-    ]
-  ]).reply_markup;
+    [Markup.button.callback('English', 'lang_EN')],
+    [Markup.button.callback('Русский', 'lang_RU')]
+  ]);
 }
 
 /**
@@ -192,10 +151,10 @@ export function formatBooleanValue(locale: string, value: boolean): string {
 export function getLocalizedResolutionName(locale: string, resolution: Resolution): string {
   const lang = locale.toLowerCase().startsWith('ru') ? 'ru' : 'en';
   switch (resolution) {
-    case 'SQUARE': return i18next.t('bot:settings.resolution.square', { lng: lang });
-    case 'VERTICAL': return i18next.t('bot:settings.resolution.vertical', { lng: lang });
-    case 'HORIZONTAL': return i18next.t('bot:settings.resolution.horizontal', { lng: lang });
-    default: return i18next.t('bot:settings.resolution.square', { lng: lang }); // По умолчанию квадратное
+    case 'SQUARE': return i18next.t('bot:settings.resolution_square', { lng: lang });
+    case 'VERTICAL': return i18next.t('bot:settings.resolution_vertical', { lng: lang });
+    case 'HORIZONTAL': return i18next.t('bot:settings.resolution_horizontal', { lng: lang });
+    default: return i18next.t('bot:settings.resolution_square', { lng: lang }); // По умолчанию квадратное
   }
 }
 
@@ -210,9 +169,9 @@ export function getLocalizedLanguageName(displayLocale: string, languageCode: st
   const langCodeLower = languageCode?.toLowerCase() || 'en'; // По умолчанию 'en', если язык не установлен
 
   if (langCodeLower === 'ru') {
-    return i18next.t('bot:settings.language_name.ru', { lng: langForDisplay });
+    return i18next.t('bot:settings.language_ru', { lng: langForDisplay });
   } else {
-    return i18next.t('bot:settings.language_name.en', { lng: langForDisplay });
+    return i18next.t('bot:settings.language_en', { lng: langForDisplay });
   }
 }
 
@@ -228,31 +187,14 @@ export function formatSettingsInfo(locale: string, settings: UserSettings, dimen
   
   // Получаем локализованные значения
   const resolutionText = getLocalizedResolutionName(lang, settings.resolution);
-  const useNegativePromptText = formatBooleanValue(lang, settings.useNegativePrompt);
-  const useSeedText = formatBooleanValue(lang, settings.useSeed);
   const languageText = getLocalizedLanguageName(lang, settings.language || 'EN');
 
-  // Получаем локализованные метки
-  const resolutionLabel = i18next.t('bot:settings.resolution.label', { lng: lang });
-  const negativePromptLabel = i18next.t('bot:settings.negative_prompt_label', { lng: lang });
-  const randomSeedLabel = i18next.t('bot:settings.random_seed_label', { lng: lang });
-  const batchSizeLabel = i18next.t('bot:settings.batch_size_label', { lng: lang });
-  const languageLabel = i18next.t('bot:settings.language_label', { lng: lang });
-
   // Используем локализованный шаблон
-  return i18next.t('bot:settings.info_template', {
+  return i18next.t('bot:settings.info', {
     lng: lang,
-    resolution_label: resolutionLabel,
     resolution: resolutionText,
     width: dimensions.width,
     height: dimensions.height,
-    negative_prompt_label: negativePromptLabel,
-    useNegativePrompt: useNegativePromptText,
-    random_seed_label: randomSeedLabel,
-    useSeed: useSeedText,
-    batch_size_label: batchSizeLabel,
-    batchSize: settings.batchSize,
-    language_label: languageLabel,
     language: languageText,
   });
 }
