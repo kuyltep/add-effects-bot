@@ -51,6 +51,7 @@ function getScriptPath(basePath: string): string {
 const workers = [
   { name: 'imageEffectWorker', script: '../queues/imageEffectWorker' },
   { name: 'videoWorker', script: '../queues/videoWorker' },
+  {name: "upgradeWorker", script: "../queues/upgradeWorker"}
 ];
 
 // Function to find the correct worker script file (JS or TS)
