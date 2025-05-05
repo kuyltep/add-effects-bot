@@ -107,27 +107,6 @@ async function downloadTelegramFile(fileId: string): Promise<string> {
     
     throw new Error(`Timed out after ${maxWaitTime}ms waiting for file download`);
 }
-
-/**
- * Applies a watermark to an image buffer.
- */
-async function applyWatermark(imageBuffer: Buffer): Promise<Buffer> {
-    try {
-        const image = sharp(imageBuffer);
-        const svg = `
-            <svg width="100" height="100" xmlns="http://www.w3.org/2000/svg">
-                <rect width="100%" height="100%" fill="rgba(0,0,0,0.4)" rx="10" ry="10" />
-                <text x="50%" y="50%" font-family="Arial, sans-serif" font-weight="bold" font-size="14" fill="white" text-anchor="middle" alignment-baseline="middle">AI Image</text>
-            </svg>
-        `;
-        const logoBuffer = await sharp(Buffer.from(svg)).resize(100, 100).toBuffer();
-        return await image.composite([{ input: logoBuffer, gravity: 'southeast', left: 10, top: 10 }]).toBuffer();
-    } catch (error) {
-        Logger.warn('Failed to apply watermark', { error });
-        return imageBuffer; // Return original if watermarking fails
-    }
-}
-
 /**
  * Processes an image effect generation job.
  */
