@@ -11,13 +11,10 @@ import path from "path";
 // Log token first few chars for debugging
 
 export const replicate = new Replicate({auth: process.env.REPLICATE_API_TOKEN});
-fal.config({
-  credentials: process.env.FAL_API_KEY
-});
+
 // Base API URL for webhook callbacks
 const API_BASE_URL = process.env.API_BASE_URL;
 
-const REMOVE_CREASERS_PROMPT="Please remove white scratches and cracks in the photo. People's faces should remain as similar and untouched as possible."
 /**
  * Enhance image quality using Aura SR model
  * @param imagePath Path to the source image
@@ -238,7 +235,7 @@ export async function processCompletedVideo(
   }
 }
 
-function getMimeType(filePath: string) {
+export function getMimeType(filePath: string) {
   const extension = path.extname(filePath).toLowerCase();
   switch (extension) {
     case ".jpg":
