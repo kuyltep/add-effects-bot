@@ -66,7 +66,7 @@ async function showEffectSelection(ctx: MyContext): Promise<void> {
 /**
  * Handles the selection of an effect.
  */
-effectSelectorHandler.action(/select_effect_(claymation|ghibli|pixar|plushify|early_ghibli|3d_cartoon)/, async (ctx) => {
+effectSelectorHandler.action(/select_effect_(claymation|ghibli|pixar|plushify|ghiblify|cartoonify)/, async (ctx) => {
   await ctx.answerCbQuery();
   const state = ctx.wizard.state as GenerateWizardState;
   const selectedEffect = ctx.match[1] as EffectType;
