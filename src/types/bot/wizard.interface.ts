@@ -1,6 +1,23 @@
-import { GenerationData } from './generation.interface';
 import { UserSettings } from './settings.interface';
 import { Resolution } from './settings.type';
+import { User } from '@prisma/client';
+import { Context } from 'telegraf';
+import { PrismaClient } from '@prisma/client';
+
+/**
+ * Base context interface extending Telegraf's Context
+ * Includes session data and i18n support
+ */
+export interface MyContext extends Context {
+  session: any;
+  i18n: {
+    locale: (lang: string) => void;
+    t: (key: string, options?: any) => string;
+  };
+  prisma: PrismaClient;
+  scene: any; // Scenes.SceneContextScene<MyContext, Scenes.WizardSessionData>;
+  wizard: any; //Scenes.WizardContextWizard<MyContext>;
+}
 
 /**
  * Interface for user data stored in wizard state
@@ -16,6 +33,9 @@ export interface WizardUserData {
   subscriptionActive: boolean;
   /** User's referral code */
   referralCode: string;
+  /** User language code */
+  language?: string;
+  telegramId: string;
 }
 
 /**
@@ -73,4 +93,20 @@ export interface SettingsWizardState {
     /** Model to use for generation */
     model?: string;
   };
+}
+
+// Define the possible effect types
+export type EffectType = 'claymation' | 'ghibli' | 'pixar' | 'plushify' | 'ghiblify' | 'cartoonify';
+
+/**
+ * Data specific to the generation process
+ */
+export interface GenerationData {
+  prompt?: string;
+  negativePrompt?: string;
+  seed?: number;
+  batchSize?: number;
+  fileId?: string;
+  hasPhoto?: boolean;
+  effect?: EffectType;
 } 

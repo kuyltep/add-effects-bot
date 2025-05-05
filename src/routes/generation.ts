@@ -1,71 +1,8 @@
 import { FastifyInstance, FastifyPluginOptions } from 'fastify';
-import { generateImage } from '../services/generation';
 import { prisma } from '../utils/prisma';
-import config from '../config';
 import { processCompletedVideo } from '../services/replicate';
 
 export default async function (fastify: FastifyInstance, options: FastifyPluginOptions) {
-  // Create a new image generation
-  fastify.post(
-    '/',
-    {
-      preHandler: (fastify as any).authenticate,
-    },
-    async (request, reply) => {
-      try {
-        const userId = (request.user as { id: string }).id;
-        const {
-          prompt,
-          negativePrompt,
-          seed = -1,
-          width = config.defaultGenerationSettings.width,
-          height = config.defaultGenerationSettings.height,
-          batchSize = config.defaultGenerationSettings.batchSize,
-          model = config.reve.defaultModel,
-        } = request.body as {
-          prompt: string;
-          negativePrompt?: string;
-          seed?: number;
-          width?: number;
-          height?: number;
-          batchSize?: number;
-          model?: string;
-        };
-
-        // Validate prompt
-        if (!prompt || prompt.length < 3) {
-          return reply.status(400).send({ error: 'Prompt is too short' });
-        }
-
-        // Generate the image
-        const generation = await generateImage({
-          userId,
-          prompt,
-          negativePrompt,
-          seed,
-          width,
-          height,
-          batchSize,
-          model,
-        });
-
-        return reply.send({ generation });
-      } catch (error: any) {
-        request.log.error(error);
-
-        if (error.message === 'Insufficient remaining generations') {
-          return reply.status(402).send({
-            error: 'Insufficient remaining generations',
-            message:
-              'You need to subscribe or invite friends with your referral code to get more generations',
-          });
-        }
-
-        return reply.status(500).send({ error: 'Generation failed' });
-      }
-    }
-  );
-
   // Video generation webhook callback
   fastify.post(
     '/video-webhook/:webhookId',

@@ -4,11 +4,8 @@ import config from '../config';
 import cron from 'node-cron';
 import { checkExpiredSubscriptions } from './expired-subscription';
 import { cleanupPendingPayments } from './payment';
-import { resetErrorStatusAfterCooldown } from './reve-account';
 import { Logger } from '../utils/rollbar.logger';
 
-// Directory where uploads are stored
-const uploadsDir = config.server.uploadDir;
 
 /**
  * Delete a specific image file
@@ -147,21 +144,6 @@ export async function cleanupPayments(): Promise<void> {
 }
 
 /**
- * Reset Reve account error status after cooldown
- */
-export async function resetReveAccountErrors(): Promise<void> {
-  try {
-
-    const count = await resetErrorStatusAfterCooldown();
-
-  } catch (error) {
-    Logger.error(error, { 
-      context: 'reve-account-reset'
-    });
-  }
-}
-
-/**
  * Setup periodic cleanup tasks using node-cron
  * This function should be called on application startup
  * @returns The scheduled cron job
@@ -193,14 +175,6 @@ export function setupCleanupTask(): cron.ScheduledTask {
         task: 'payment-cleanup'
       });
     });
-    
-    // Reset Reve account error status
-    await resetReveAccountErrors().catch(error => {
-      Logger.error(error, { 
-        context: 'scheduled-cleanup',
-        task: 'reve-account-reset'
-      });
-    });
   });
   
   return cronJob;
@@ -218,8 +192,7 @@ export async function runAllCleanupTasks(): Promise<void> {
     const results = await Promise.allSettled([
       cleanupOldFiles(3600000),
       checkSubscriptions(),
-      cleanupPayments(),
-      resetReveAccountErrors()
+      cleanupPayments()
     ]);
     
     // Log results

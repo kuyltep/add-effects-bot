@@ -100,11 +100,11 @@ function setupRedisSubscriber() {
     'bot:status_update',
     'bot:delete_message',
     'bot:download_file',
-    'bot:send_restoration',
     'bot:send_video',
     'bot:send_document',
     'bot:crease_error_choice',
-    'bot:payment_success'
+    'bot:payment_success',
+    'bot:send_effect'
   );
   
   // Handle messages
@@ -177,11 +177,6 @@ function setupRedisSubscriber() {
             console.error('Error downloading file:', error);
           }
           break;
-        
-        case 'bot:send_restoration':
-          // Send restoration results to user
-          await sendRestorationResults(data);
-          break;
           
         case 'bot:send_video':
           // Send video to user
@@ -196,6 +191,11 @@ function setupRedisSubscriber() {
         case 'bot:payment_success':
           // Handle payment success notification
           await sendPaymentSuccessNotification(data);
+          break;
+          
+        case 'bot:send_effect':
+          // Send effect results to user
+          await sendEffectResults(data);
           break;
       }
     } catch (error) {
@@ -302,21 +302,65 @@ async function sendDocumentToUser(data) {
   }
 }
 
-// Function to send restoration results via bot
-async function sendRestorationResults(data) {
+// Function to send payment success notification to user
+async function sendPaymentSuccessNotification(data: { 
+  telegramId: string;
+  generationsAdded: number;
+  amount: number;
+}) {
+  try {
+    if (!data.telegramId) {
+      console.error('Missing telegramId in payment success data');
+      return;
+    }
+
+    // Get user with settings to determine language
+    const user = await prisma.user.findFirst({
+      where: { telegramId: data.telegramId },
+      include: { settings: true }
+    });
+    
+    // Default to Russian if no language preference found
+    const language = user?.settings?.language?.toLowerCase() || 'ru';
+    
+    // Send payment success message
+    await bot.telegram.sendMessage(
+      data.telegramId,
+      i18next.t('bot:payments.success', { 
+        lng: language,
+        count: data.generationsAdded,
+        amount: data.amount
+      }),
+      { 
+        parse_mode: 'HTML',
+        reply_markup: Markup.inlineKeyboard([
+          [Markup.button.callback(i18next.t('bot:buttons.generate_now', { lng: language }), 'generate_more')]
+        ]).reply_markup
+      }
+    );
+    
+    console.log(`Payment success notification sent to user ${data.telegramId}`);
+  } catch (error) {
+    console.error('Error sending payment success notification:', error);
+  }
+}
+
+// Function to send effect results via bot
+async function sendEffectResults(data) {
   const chatId = data?.chatId;
   const { 
     imageData,
     userId,
     language,
     referralCode,
-    generationId
+    generationId,
+    effect
   } = data;
   try {
 
     
     if (!chatId || !imageData) {
-      console.error('Missing chatId or imageData in restoration results data');
+      console.error('Missing chatId or imageData in effect results data');
       return;
     }
 
@@ -337,8 +381,8 @@ async function sendRestorationResults(data) {
       referralCode
     });
     
-    // Send the restored image with caption
-    console.log(`Sending restored image to chat ${chatId}: ${imagePath} (isUrl: ${isUrl})`);
+    // Send the effect image with caption
+    console.log(`Sending effect image to chat ${chatId}: ${imagePath} (isUrl: ${isUrl})`);
     
     try {
       if (isUrl) {
@@ -368,7 +412,7 @@ async function sendRestorationResults(data) {
       console.error('Error sending photo:', photoError);
       await bot.telegram.sendMessage(
         chatId,
-        'Could not send the restored photo, but the restoration was completed. Please try again.',
+        'Could not send the processed photo, but the effect was applied. Please try again.',
         { parse_mode: 'HTML' }
       );
     }
@@ -434,7 +478,7 @@ async function sendRestorationResults(data) {
       await bot.telegram.sendMessage(chatId, remainingGenerationsText, keyboard);
     }
   } catch (error) {
-    console.error('Error sending restoration results:', error);
+    console.error('Error sending effect results:', error);
     try {
       if (chatId) {
         // Send error message as fallback
@@ -450,96 +494,63 @@ async function sendRestorationResults(data) {
   }
 }
 
-// Function to send payment success notification to user
-async function sendPaymentSuccessNotification(data: { 
-  telegramId: string;
-  generationsAdded: number;
-  amount: number;
-}) {
-  try {
-    if (!data.telegramId) {
-      console.error('Missing telegramId in payment success data');
-      return;
-    }
-
-    // Get user with settings to determine language
-    const user = await prisma.user.findFirst({
-      where: { telegramId: data.telegramId },
-      include: { settings: true }
-    });
-    
-    // Default to Russian if no language preference found
-    const language = user?.settings?.language?.toLowerCase() || 'ru';
-    
-    // Send payment success message
-    await bot.telegram.sendMessage(
-      data.telegramId,
-      i18next.t('bot:payments.success', { 
-        lng: language,
-        count: data.generationsAdded,
-        amount: data.amount
-      }),
-      { 
-        parse_mode: 'HTML',
-        reply_markup: Markup.inlineKeyboard([
-          [Markup.button.callback(i18next.t('bot:buttons.generate_now', { lng: language }), 'generate_more')]
-        ]).reply_markup
-      }
-    );
-    
-    console.log(`Payment success notification sent to user ${data.telegramId}`);
-  } catch (error) {
-    console.error('Error sending payment success notification:', error);
-  }
-}
-
 export async function stopBot() {
-  console.log('Stopping Telegram bot...');
-  try {
-    // Close the Redis subscriber connection
-    if (redisSubscriber) {
+  console.log('Stopping bot...');
+  // Ensure Redis subscriber exists before trying to unsubscribe and quit
+  if (redisSubscriber) {
+    try {
+      await redisSubscriber.unsubscribe();
       await redisSubscriber.quit();
-      console.log('Bot Redis subscriber closed');
+      console.log('Redis subscriber disconnected');
+    } catch (error) {
+      console.error('Error disconnecting Redis subscriber:', error);
     }
-    
-    // Close the Redis publisher connection
-    if (redisPublisher) {
-      await redisPublisher.quit();
-      console.log('Bot Redis publisher closed');
-    }
-    
-    // Close the Redis connection
-    if (redisConnection) {
-      await redisConnection.quit();
-      console.log('Bot Redis connection closed');
-    }
-    
-    // Stop the bot
-    bot.stop();
-    console.log('Telegram bot stopped successfully');
-  } catch (error) {
-    console.error('Error stopping Telegram bot:', error);
   }
+
+  // Ensure Redis publisher exists before trying to quit
+  if (redisPublisher) {
+    try {
+      await redisPublisher.quit();
+      console.log('Redis publisher disconnected');
+    } catch (error) {
+      console.error('Error disconnecting Redis publisher:', error);
+    }
+  }
+
+  // Ensure Redis connection exists before trying to quit
+  if (redisConnection) {
+    try {
+      await redisConnection.quit();
+      console.log('Redis connection disconnected');
+    } catch (error) {
+      console.error('Error disconnecting Redis connection:', error);
+    }
+  }
+
+  // Stop the bot instance
+  bot.stop();
+  console.log('Bot stopped.');
 }
 
-// Функция для получения основной клавиатуры
-// No longer pre-created to allow dynamic language fetching
-export function getMainKeyboard(locale: string = 'ru') {
-  const lang = locale.toLowerCase().startsWith('ru') ? 'ru' : 'en';
+// Function to generate the main keyboard layout based on locale
+// export function getMainKeyboard(locale: string = 'ru') {
+//   // Ensure locale exists in i18next resources
+//   const currentLocale = i18next.exists(locale) ? locale : 'ru';
   
-  // Use i18next to get localized button texts
-  const restoreText = i18next.t('bot:keyboard.generate', { lng: lang });
-  const balanceText = i18next.t('bot:keyboard.balance', { lng: lang });
-  const referralText = i18next.t('bot:keyboard.referral', { lng: lang });
-  const supportMenuText = i18next.t('bot:keyboard.support_menu', { lng: lang });
-  
-  return Markup.keyboard([
-    [restoreText, balanceText],
-    [referralText, supportMenuText],
-  ]).resize();
-}
+//   return Markup.keyboard([
+//     [
+//       Markup.button.text(i18next.t('bot:menu.generate', { lng: currentLocale })),
+//       Markup.button.text(i18next.t('bot:menu.balance', { lng: currentLocale }))
+//     ],
+//     [
+//       Markup.button.text(i18next.t('bot:menu.subscription', { lng: currentLocale })),
+//       Markup.button.text(i18next.t('bot:menu.referral', { lng: currentLocale })),
+//       Markup.button.text(i18next.t('bot:menu.settings', { lng: currentLocale }))
+//     ],
+//     [Markup.button.text(i18next.t('bot:menu.help', { lng: currentLocale }))]
+//   ]).resize();
+// }
 
-// Функция запуска бота
 export async function startBot() {
   try {
     // Initialize Redis clients

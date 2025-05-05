@@ -170,12 +170,11 @@ export function setupKeyboardHandlers() {
     // Map scene names to their corresponding i18n keys
     const sceneKeyMap: { [key: string]: string } = {
       // Note: The scene name for restore is 'generate'
-      generate: 'bot:keyboard.restore', 
+      generate: 'bot:keyboard.generate',
       balance: 'bot:keyboard.balance',
       referral: 'bot:keyboard.referral',
       supportMenu: 'bot:keyboard.support_menu',
-      // help: 'bot:keyboard.help',
-      // links: 'bot:keyboard.links',
+      settings: 'bot:keyboard.settings',
     };
 
     let targetScene: string | null = null;
@@ -192,8 +191,9 @@ export function setupKeyboardHandlers() {
 
     if (targetScene) {
       console.log(`Entering ${targetScene} scene via keyboard button (locale: ${locale})`);
+      // Always clear the current scene to prevent stacking
+      await ctx.scene.leave();
       // Enter the appropriate scene
-      // Scenes should handle their own initial messages and checks
       return ctx.scene.enter(targetScene);
     }
 
@@ -210,7 +210,7 @@ export function setupPackageCallbacks() {
   });
 
   // Обработка выбора пакета генераций
-  bot.action(/package_(package100|package250|package500|package1000)/, async ctx => {
+  bot.action(/package_(package1|package2|package3|package4)/, async ctx => {
     await ctx.answerCbQuery();
     const packageType = ctx.match[1];
     

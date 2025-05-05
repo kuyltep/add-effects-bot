@@ -2,228 +2,208 @@ import { Composer, Context, Markup, Scenes } from 'telegraf';
 import { 
   MyContext, 
   GenerateWizardState,
+  EffectType
 } from '../../types';
 import { 
-  processGeneration,
   canUserGenerate,
+  queueImageGenerationJob
 } from '../../services/generation';
 import { 
   transitionToScene,
-  initializeWizardState
+  initializeWizardState,
+  handleSceneError,
+  exitScene
 } from '../../services/scene';
 import { Logger } from '../../utils/rollbar.logger';
 
-// STEP HANDLER
-// Step handlers - each step of the wizard flow
+// STEP HANDLERS
+const effectSelectorHandler = new Composer<MyContext>();
 const photoHandler = new Composer<MyContext>();
-const creasesHandler = new Composer<MyContext>();
 
-// WIZARD STEP TRANSITIONS
+// Define effect types and their corresponding labels for the keyboard
+const effectOptions: { key: EffectType; labelKey: string }[] = [
+  // OpenAI-processed effects
+  { key: 'claymation', labelKey: 'bot:generate.effect_claymation' },
+  { key: 'ghibli', labelKey: 'bot:generate.effect_ghibli' },
+  { key: 'pixar', labelKey: 'bot:generate.effect_pixar' },
+  // FAL AI-processed effects
+  { key: 'plushify', labelKey: 'bot:generate.effect_plushify' },
+  { key: 'ghiblify', labelKey: 'bot:generate.effect_ghiblify' },
+  { key: 'cartoonify', labelKey: 'bot:generate.effect_cartoonify' },
+];
+
+// WIZARD STEP TRANSITIONS & HANDLERS
 
 /**
- * Transitions to crease detection question
+ * Sends the effect selection message and keyboard.
  */
-async function transitionToCreaseQuestion(ctx: MyContext): Promise<void> {
-  const cost = +process.env.RESTORATION_COST || 1;
-  const cost_hard = +process.env.RESTORATION_COST_HARD || 3;
+async function showEffectSelection(ctx: MyContext): Promise<void> {
+  const buttons = effectOptions.map(option => 
+    Markup.button.callback(ctx.i18n.t(option.labelKey), `select_effect_${option.key}`)
+  );
   
-  await ctx.reply(ctx.i18n.t('bot:generate.creases_question', {
-    cost,
-    cost_hard
-  }), {
+  // Add Back button
+  buttons.push(Markup.button.callback(ctx.i18n.t('common.cancel'), 'cancel_generation'));
+  
+  // Create a keyboard with 2 columns
+  const keyboard = [];
+  for (let i = 0; i < buttons.length - 1; i += 2) {
+    const row = [buttons[i]];
+    if (i + 1 < buttons.length - 1) {
+      row.push(buttons[i + 1]);
+    }
+    keyboard.push(row);
+  }
+  // Add the cancel button in its own row
+  keyboard.push([buttons[buttons.length - 1]]);
+
+  await ctx.reply(ctx.i18n.t('bot:generate.select_effect_prompt'), {
     parse_mode: 'HTML',
-    reply_markup: Markup.inlineKeyboard([
-      [
-        Markup.button.callback(ctx.i18n.t('bot:generate.yes_button', {
-          cost: cost_hard
-        }), 'has_creases'),
-        Markup.button.callback(ctx.i18n.t('bot:generate.no_button', {
-          cost
-        }), 'no_creases')
-      ],
-    ]).reply_markup,
+    reply_markup: Markup.inlineKeyboard(keyboard).reply_markup,
   });
-  ctx.wizard.next();
 }
 
 /**
- * Proceeds directly to generation after crease detection
+ * Handles the selection of an effect.
  */
-async function proceedToGeneration(ctx: MyContext, state: GenerateWizardState): Promise<void> {
-  await processGeneration(ctx);
+effectSelectorHandler.action(/select_effect_(claymation|ghibli|pixar|plushify|ghiblify|cartoonify)/, async (ctx) => {
+  await ctx.answerCbQuery();
+  const state = ctx.wizard.state as GenerateWizardState;
+  const selectedEffect = ctx.match[1] as EffectType;
+
+  if (!state?.generationData) {
+    Logger.warn('State missing in effect selection', { userId: ctx.from?.id });
+    return exitWithError(ctx, 'bot:errors.general');
+  }
+
+  // Store the selected effect
+  state.generationData.effect = selectedEffect;
+
+  // Prompt for photo
+  try {
+     await ctx.editMessageText(ctx.i18n.t('bot:generate.send_photo_for_effect'), {
+       parse_mode: 'HTML',
+     });
+  } catch (error) {
+     // If editing fails (e.g., message too old), send a new message
+     await ctx.reply(ctx.i18n.t('bot:generate.send_photo_for_effect'), {
+       parse_mode: 'HTML',
+     });
+  }
+
+  // Move to the photo handler step
+  return ctx.wizard.next();
+});
+
+effectSelectorHandler.action('cancel_generation', async (ctx) => {
+  await ctx.answerCbQuery();
+  return exitScene(ctx, 'bot:generate.cancelled');
+});
+
+/**
+ * Handles photo/document input from the user.
+ */
+async function handlePhotoInput(ctx: MyContext, fileId: string): Promise<void> {
+  const state = ctx.wizard.state as GenerateWizardState;
+  if (!state?.generationData?.effect || !state?.userData?.id || !state?.userSettings?.resolution) {
+    Logger.warn('State missing in photo handler', { userId: ctx.from?.id });
+    return exitWithError(ctx, 'bot:errors.general');
+  }
+
+  const { effect } = state.generationData;
+  const { id: userId, language } = state.userData;
+  const { resolution } = state.userSettings;
+
+  try {
+    // Send confirmation and queue the job
+    const statusMessage = await ctx.reply(ctx.i18n.t('bot:generate.processing_queued'), { parse_mode: 'HTML' });
+
+    await queueImageGenerationJob({
+      userId,
+      generationId: '', // Will be generated in the service
+      fileId: fileId, // Pass file ID from Telegram
+      effect,
+      chatId: ctx.chat?.id.toString() || '',
+      messageId: statusMessage.message_id,
+      language: language || ctx.i18n.locale || 'en',
+      resolution: resolution
+    });
+
+  } catch (error) {
+    Logger.error(error, { context: 'queueImageGenerationJob', userId });
+    await ctx.reply(ctx.i18n.t('bot:generate.queue_error'));
+  }
+
+  // Leave the scene after queuing
   await ctx.scene.leave();
 }
 
-// STEP HANDLERS
-
 // Handler for processing user's photo input
 photoHandler.on('photo', async ctx => {
-  // Get the largest photo size
   const photoSizes = ctx.message.photo;
   const largestPhoto = photoSizes[photoSizes.length - 1];
-  
-  // Get file ID for download
-  const fileId = largestPhoto.file_id;
-  
-  // Access stored user data from state
-  const state = ctx.wizard.state as GenerateWizardState;
-  state.generationData.fileId = fileId;
-  state.generationData.hasPhoto = true;
-  
-  // Proceed to crease detection question
-  await transitionToCreaseQuestion(ctx);
+  await handlePhotoInput(ctx, largestPhoto.file_id);
 });
 
 // Handle document messages (files)
 photoHandler.on('document', async ctx => {
   const { document } = ctx.message;
-  
-  // Check if document is a photo/image
-  if (!document.mime_type || !document.mime_type.startsWith('image/')) {
+  if (!document.mime_type?.startsWith('image/')) {
     await ctx.reply(ctx.i18n.t('bot:generate.not_an_image'));
     return; // Stay in this step
   }
-  
-  // Get file ID for download
-  const fileId = document.file_id;
-  
-  // Access stored user data from state
-  const state = ctx.wizard.state as GenerateWizardState;
-  state.generationData.fileId = fileId;
-  state.generationData.hasPhoto = true;
-
-  await transitionToCreaseQuestion(ctx);
+  await handlePhotoInput(ctx, document.file_id);
 });
 
-// Handle text messages (invalid input)
+// Handle text messages (invalid input in photo step)
 photoHandler.on('text', async ctx => {
   if (ctx.message.text === '/cancel') {
-    // Allow cancel command
-    await ctx.reply(ctx.i18n.t('bot:generate.cancelled'));
-    return ctx.scene.leave();
+    return exitScene(ctx, 'bot:generate.cancelled');
   }
-  
-  // Remind user to send a photo
-  await ctx.reply(ctx.i18n.t('bot:generate.no_photo'));
-  return; // Stay in this step
+  await ctx.reply(ctx.i18n.t('bot:generate.send_photo_for_effect'));
 });
 
-// Handle all other message types
+// Handle all other message types in photo step
 photoHandler.on('message', async ctx => {
-  // Remind user to send a photo
-  await ctx.reply(ctx.i18n.t('bot:generate.no_photo'));
-  return; // Stay in this step
+  await ctx.reply(ctx.i18n.t('bot:generate.send_photo_for_effect'));
 });
 
-// SCENE DEFINITION AND SETUP
-
-// Define wizard scene with explicit steps and action handlers
+// SCENE DEFINITION
 export const generateScene = new Scenes.WizardScene<MyContext>(
   'generate',
-  // Step 0: Initial setup and prompt for input
+  // Step 0: Initial check and effect selection
   async (ctx) => {
-    // Get user ID and initialize state
     const telegramId = ctx.from?.id.toString() || '';
-
     const initState = await initializeWizardState(ctx, telegramId);
-    const canGenerate = await canUserGenerate(ctx, {remainingGenerations: initState.userData.remainingGenerations});
+    if (!initState || !initState.userData) {
+      return exitWithError(ctx, 'bot:errors.not_registered'); // Or general error
+    }
+
+    const canGenerate = await canUserGenerate(ctx, initState.userData);
     if (!canGenerate) {
       return ctx.scene.leave();
     }
     
-    if (!initState) {
-      Logger.warn('Failed to initialize state in generate scene', { 
-        telegramId,
-        chatId: ctx.chat?.id
-      });
-      return ctx.scene.leave();
-    }
-    
-    // Immediately prompt for photo
-    await ctx.reply(ctx.i18n.t('bot:generate.start'), { 
-      parse_mode: 'HTML'
-    });
-    
-    // Move to photo input step
-    return ctx.wizard.next();
+    await showEffectSelection(ctx);
+    return ctx.wizard.next(); // Move to effect selection handler step
   },
-  
-  // Step 1: Get photo
-  photoHandler,
-  
-  // Step 2: Get crease info
-  creasesHandler
+  // Step 1: Handle effect selection callback
+  effectSelectorHandler,
+  // Step 2: Handle photo input
+  photoHandler
 );
 
-// Setup callback actions for the scene after creation
-function setupSceneHandlers(scene: Scenes.BaseScene<MyContext>) {
-  // Invite friend button handler
-  scene.action('invite_friend', async ctx => {
-    await transitionToScene(ctx, 'referral');
-  });
-
-  // Has creases button handler
-  scene.action('has_creases', async ctx => {
-    await ctx.answerCbQuery();
-    const state = ctx.wizard.state as GenerateWizardState;
-    
-    if (!state || !state.generationData) {
-      Logger.error('State or generationData is undefined in has_creases handler', {
-        chatId: ctx.chat?.id,
-        userId: ctx.from?.id
-      });
-      await ctx.reply(ctx.i18n.t('bot:errors.general'));
-      return ctx.scene.leave();
-    }
-    
-    // Set creases flag
-    state.generationData.hasCreases = true;
-    
-    // Process generation immediately
-    await proceedToGeneration(ctx, state);
-  });
-
-  // No creases button handler
-  scene.action('no_creases', async ctx => {
-    await ctx.answerCbQuery();
-    const state = ctx.wizard.state as GenerateWizardState;
-    
-    if (!state || !state.generationData) {
-      Logger.error('State or generationData is undefined in no_creases handler', {
-        chatId: ctx.chat?.id,
-        userId: ctx.from?.id
-      });
-      await ctx.reply(ctx.i18n.t('bot:errors.general'));
-      return ctx.scene.leave();
-    }
-    
-    // Set creases flag
-    state.generationData.hasCreases = false;
-
-    
-    
-    // Process generation immediately
-    await proceedToGeneration(ctx, state);
-  });
-  
-  // Handle scene cancellation
-  scene.command('cancel', async ctx => {
-    await ctx.reply(ctx.i18n.t('bot:generate.cancelled'));
-    return ctx.scene.leave();
-  });
-
-  // Handle interruptions
-  scene.use(async (ctx, next) => {
-    // Allow specific commands to interrupt the scene
-    if (ctx.message && 'text' in ctx.message) {
-      const text = ctx.message.text;
-      if (text === '/cancel' || text === '/start' || text === '/help') {
-        return; // Let the command handlers take care of this
-      }
-    }
-    return next();
-  });
+// Generic error handler for the scene
+async function exitWithError(ctx: MyContext, messageKey: string) {
+  try {
+    await ctx.reply(ctx.i18n.t(messageKey));
+  } catch (replyError) {
+     Logger.warn(`Failed to send error message ${messageKey}`, { userId: ctx.from?.id, error: replyError });
+  }
+  return ctx.scene.leave();
 }
 
-// Set up scene handlers
-setupSceneHandlers(generateScene);
+// Setup general scene behaviors (like cancel)
+// generateScene.command('cancel', async (ctx) => exitScene(ctx, 'bot:generate.cancelled'));
+// Handle interruptions if needed (already partially handled by command handlers)
+// generateScene.use(async (ctx, next) => { ... });

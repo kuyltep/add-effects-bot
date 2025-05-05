@@ -1,40 +1,45 @@
-# Old new AI Telegram Bot & API
+# Avato AI Effects Telegram Bot
 
-A service for generating AI images, videos, and enhancements using various AI providers, featuring a Telegram bot interface and a REST API.
+A Telegram bot service for applying artistic effects to images, generating videos from images, and enhancing photos using various AI providers.
 
 ## Features Overview
 
-- 🤖 Telegram bot for image generation, video animation, and image enhancement
-- 🖼️ AI-powered image generation via Reve AI
-- 🎬 Video animation with multiple effect options (animation, hug) via Reve AI
-- ✨ AI-powered image enhancement via Replicate
-- 🔄 Automatic translation of prompts to English (using OpenAI)
-- 👥 Referral system with rewards
-- 💳 Payment processing with Robokassa
-- 👨‍💼 Admin panel for user management
-- 📊 Statistics and user analytics
-- 🔒 JWT authentication for API access
+- 🤖 Telegram bot for image effects, video animation, and image enhancement
+- 🖼️ Multiple AI-powered image style effects:
+  - Pixar style (via OpenAI)
+  - Ghibli anime style (via OpenAI)
+  - Claymation cartoon style (via OpenAI)
+  - Plush toy effect (via FAL AI)
+  - Ghibli animation style (via FAL AI)
+  - 3D cartoon effect (via FAL AI)
+- 🎬 Video animation from still images with customizable prompts
+- ✨ AI-powered image upscaling/enhancement 
+- 🔄 Automatic translation of non-English prompts (using OpenAI)
+- 👥 Referral system with reward generations
+- 💳 Payment processing system for generation credits
+- 📱 User settings (resolution, language)
 - 🌐 Multilingual support (English and Russian)
-- 📱 User settings and preferences
-- 🔄 Background job processing with BullMQ
-- 🌍 OpenAI-powered prompt translation
-- 💾 Consistent local file storage for generated media
-- 🧹 Automatic cleanup of stale pending payments
-- ⚙️ Centralized payment package configuration via `.env`
+- 🔄 Background job processing with Redis-based queuing
+- 💾 Consistent file management for generated media
+- 🧹 Automatic cleanup of old files
 
 ## Prerequisites
 
-*   Node.js (v18+)
-*   PostgreSQL
-*   Redis
-*   Credentials for external services (Telegram Bot, Robokassa, OpenAI, Replicate). See `.env.example`.
+* Node.js (v18+)
+* PostgreSQL
+* Redis
+* API credentials for:
+  * Telegram Bot Token
+  * OpenAI API
+  * FAL AI
+  * Payment processor
 
 ## Installation
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/reve-tg.git
-   cd reve-tg
+   git clone https://github.com/yourusername/avato-effects-bot.git
+   cd avato-effects-bot
    ```
 
 2. Install dependencies:
@@ -62,149 +67,116 @@ A service for generating AI images, videos, and enhancements using various AI pr
 
 Key environment variables must be configured for the application to run. 
 
-1.  Copy the example file:
-    ```bash
-    cp .env.example .env
-    ```
-2.  Edit `.env` with your specific credentials and settings.
+1. Copy the example file:
+   ```bash
+   cp .env.example .env
+   ```
+2. Edit `.env` with your specific credentials and settings.
 
-**Refer to `.env.example` and the **Environment Variables** section in [docs.md](./docs.md) for a complete list and descriptions.**
+**Required environment variables:**
 
-## Development Commands
-
-*   `yarn dev`: Start the development server with auto-reload (using nodemon).
-*   `yarn build`: Build the project (transpile TypeScript).
-*   `yarn start`: Start the production server (requires `yarn build` first).
-*   `yarn prisma:generate`: Generate Prisma client.
-*   `yarn prisma:migrate`: Apply database migrations.
-*   `yarn format`: Format code using Prettier.
-*   `yarn lint`: Lint code using ESLint.
-
-## API Documentation
-
-**Detailed API documentation is available in [docs.md](./docs.md).**
-
-## Telegram Bot Commands
-
-A list of available bot commands can be found in the **Telegram Bot Commands** section of [docs.md](./docs.md).
+- `TELEGRAM_BOT_TOKEN` - Token for your Telegram bot obtained from BotFather
+- `POSTGRES_URL` - PostgreSQL connection URL
+- `REDIS_URL` - Redis connection URL
+- `OPENAI_API_KEY` - OpenAI API key
+- `FAL_API_KEY` - FAL AI API key
+- `OPENAI_MODEL` - OpenAI model name for image processing
+- `VIDEO_GENERATION_COST` - Cost in credits for video generation
+- `DEFAULT_LANGUAGE` - Default language (en or ru)
 
 ## Project Structure Overview
 
 ```
-app/
+project/
 ├── prisma/         # Database schema and migrations
 ├── src/            # Source code
-│   ├── bot/        # Telegram bot logic (scenes, handlers)
-│   ├── queues/     # Background job queues and workers
-│   ├── routes/     # API endpoint definitions
-│   ├── services/   # Business logic services
-│   ├── ...         # Config, utils, types, etc.
-├── uploads/        # Storage for generated media
-├── client/         # Admin panel frontend (Vue 3)
-├── .env.example    # Environment variable template
-├── package.json
-├── tsconfig.json
-├── railway.json    # Deployment config for Railway
-└── docs.md         # Detailed documentation
+│   ├── bot/        # Telegram bot logic
+│   │   ├── scenes/ # Telegram bot scenes for different interactions
+│   │   ├── keyboards/ # Keyboard layouts
+│   │   ├── middleware/ # Bot middlewares
+│   │   └── handlers.ts # Command handlers
+│   ├── services/   # Core business logic
+│   │   ├── openai.ts     # OpenAI image effects
+│   │   ├── fal-ai.ts     # FAL AI image effects
+│   │   ├── language.ts   # Translation services
+│   │   ├── sharp-service.ts # Image processing utilities
+│   │   └── ...           # Other services
+│   ├── queues/     # Background job processing
+│   ├── utils/      # Utility functions and helpers
+│   ├── types/      # TypeScript type definitions
+│   ├── locales/    # Internationalization files
+│   │   ├── en/     # English translations
+│   │   └── ru/     # Russian translations
+│   ├── routes/     # API endpoints (if any)
+│   ├── middleware/ # Express middleware
+│   └── config.ts   # Application configuration
+├── uploads/        # Storage for generated media files
+└── ...             # Configuration files
 ```
 
-**See [docs.md](./docs.md) for a more detailed structure breakdown.**
+## Bot Functionality Overview
 
-## Development
+### Image Effects
 
-```bash
-# Install dependencies
-yarn install
+The bot can apply various artistic effects to user-uploaded images:
 
-# Setup .env file (see Environment Variables)
-cp .env.example .env
-# ... edit .env ...
+1. **OpenAI-powered effects:**
+   - Pixar 3D style
+   - Ghibli anime style
+   - Claymation cartoon style
 
-# Apply database migrations
-yarn prisma:migrate
+2. **FAL AI-powered effects:**
+   - Plush toy effect
+   - Ghibli animation style
+   - 3D cartoon effect
 
-# Start in development mode
-yarn dev
-```
+### Video Generation
 
-## Deployment
+The bot can create short animated videos from still images:
+- User uploads a photo
+- User can provide a custom prompt or use default prompt
+- AI-generated video animates the subjects in the image
 
-### Deploying to Railway.app
+### Image Enhancement
 
-Railway.app is the recommended deployment platform for this project as it provides a simple way to deploy with PostgreSQL and Redis services.
+The bot can enhance and upscale user images:
+- Improves image quality
+- Adds subtle effects (sharpening, grain, vignette)
+- Applies post-processing for better results
 
-#### Prerequisites for Railway.app deployment:
+## Key Components
 
-1. A Railway.app account
-2. GitHub repository with your code
-3. All environment variables ready
+### Image Processing Pipeline
 
-#### Steps to deploy:
+All image processing uses a shared service (`sharp-service.ts`) for consistent handling across effects:
+- Image format conversion (to PNG for AI processing)
+- Resolution adjustment based on user preferences
+- Post-processing with artistic enhancements
 
-1. Create a `railway.json` file in the project root:
-   ```json
-   {
-     "build": {
-       "builder": "NIXPACKS",
-       "buildCommand": "yarn install --production=false && yarn build"
-     },
-     "deploy": {
-       "startCommand": "yarn start",
-       "healthcheckPath": "/api/health",
-       "healthcheckTimeout": 120
-     }
-   }
-   ```
+### Localization System
 
-2. Update your package.json scripts:
-   ```json
-   "scripts": {
-     "build": "tsc",
-     "start": "node dist/index.js",
-     "dev": "nodemon",
-     "prisma:generate": "prisma generate",
-     "prisma:migrate": "prisma migrate deploy"
-   }
-   ```
+The bot supports multiple languages with a comprehensive localization system:
+- Translation files in JSON format
+- Dynamic language switching in user settings
+- Automatic translation of user prompts to English for better AI results
 
-3. Add a health check endpoint to your API (`/api/health`)
+### Main Keyboard Navigation
 
-4. Log in to Railway.app and create a new project
+The bot implements a global middleware for handling main keyboard buttons:
+- Seamless navigation between scenes
+- Multi-language support for keyboard buttons
+- Consistent user experience
 
-5. Connect your GitHub repository
+## Development Commands
 
-6. Add PostgreSQL and Redis services from the Railway.app add-ons
-
-7. Set up all required environment variables
-
-8. Deploy your application
-
-9. Set up custom domain (optional) and configure Telegram webhook:
-   ```bash
-   curl -F "url=YOUR_WEBHOOK_URL" https://api.telegram.org/botYOUR_BOT_TOKEN/setWebhook
-   ```
-
-### Alternative Deployment Options
-
-Other deployment options include:
-
-- **Render.com** - Similar to Railway with flexible configuration options
-- **DigitalOcean App Platform** - PaaS with good scalability options
-- **Heroku** - Classic PaaS for Node.js applications
-- **VPS** (DigitalOcean, Linode, Vultr) - For complete control, requires manual setup
-
-## Known Issues and Limitations
-
-Refer to the relevant section in [docs.md](./docs.md).
-
-## Future Improvements
-
-Refer to the relevant section in [docs.md](./docs.md).
+* `yarn dev`: Start the development server with auto-reload (using nodemon).
+* `yarn build`: Build the project (transpile TypeScript).
+* `yarn start`: Start the production server (requires `yarn build` first).
+* `yarn prisma:generate`: Generate Prisma client.
+* `yarn prisma:migrate`: Apply database migrations.
+* `yarn format`: Format code using Prettier.
+* `yarn lint`: Lint code using ESLint.
 
 ## License
 
 MIT
-
-## Acknowledgements
-
-Refer to the **Acknowledgements** section in [docs.md](./docs.md).

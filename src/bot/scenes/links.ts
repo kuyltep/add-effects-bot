@@ -1,6 +1,6 @@
 import { Scenes } from 'telegraf';
+import { getMainKeyboard } from '../keyboards';
 import { MyContext } from '../types';
-import { getMainKeyboard } from '../core';
 
 // Create the links scene
 export const linksScene = new Scenes.BaseScene<MyContext>('links');

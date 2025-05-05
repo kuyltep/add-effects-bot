@@ -15,14 +15,16 @@
       "help": "Show available commands",
       "referral": "Referral program",
       "balance": "Check balance",
-      "settings": "Bot settings"
+      "settings": "Bot settings",
+      "restore": "Generate a new image"
     },
     "help": {
       "info": "🤖 <b>Avato memory bot Commands</b>\n\n✨ <b>Image Generation</b>\n/generate - Create a new image\n/settings - help and bot settings\n\n👤 <b>Account</b>\n/register - Create a new account\n/login - Connect to an existing account\n/balance - Check your balance\n\n🫂 <b>Referrals</b>\n/referral - Get your referral code\n\n❓ <b>Help</b>\n/help - Show this message"
     },
     "greeting": {
       "welcome_back": "Welcome back, {{name}}! You have {{remainingGenerations}} generations left.",
-      "first_time": "Welcome, {{name}}! Let's get started with Avato memory."
+      "first_time": "Welcome, {{name}}! Let's get started with Avato memory.",
+      "auto_registered": "Welcome to Avato Effects Bot, {{name}}! 🖼️\n\n You have {{remainingGenerations}} free generations.\n\n 🌳 Here you can generate amazing images with AI effects in minutes, and also bring them to life.\n\n Click on the Generate button to start👇🏻"
     },
     "errors": {
       "general": "An error occurred. Please try again later.",
@@ -52,20 +54,30 @@
       "translationNote": "Note: Your prompt was translated to English for better results.",
       "cancelled": "Image generation cancelled.",
       "noGenerations": "❌ You have no generations left.\n\nYou can:\n1. Share your referral link to get 5 free generations when someone signs up\n2. Buy more generation packages",
-      "remainingGenerations": "Great result! 😎\nYou have {{count}} photo generations left\nWant to try again?",
+      "remainingGenerations": "Great result! 😎\nYou have {{count}} image generations left\nWant to try again?",
       "uncompressed_files": "📎 Full-size files attached below.",
       "documents_message": "And as files 📂",
-      "watermark": "<a href='https://t.me/{{botUsername}}?start=p_{{referralCode}}'>Created with Avato Memory Bot 📸</a>",
+      "watermark": "<a href='https://t.me/{{botUsername}}?start=p_{{referralCode}}'>Created with Avato Memory Bot 📸</a>\n\nSupported by <a href='https://t.me/avato_ai'>Avato AI 📸</a>",
       "error": "❌ Generation failed. Please try again or contact support: @{{supportUsername}}",
-      "creases_question": "Does the photo have visible creases or folds that need to be removed?\n\n⚪️ Restore photo without damage costs {{cost}} restorations\n🟡 Restore photo with damage costs {{cost_hard}} restorations",
+      "creases_question": "Does the photo have visible effects you want to apply?\n\n⚪️ Generate image without effects costs {{cost}} generations\n🟡 Generate image with effects costs {{cost_hard}} generations",
       "yes_button": "Yes - {{cost}} restorations",
       "no_button": "No - {{cost}} restorations",
       "no_photo": "Please send a photo to restore.",
-      "start": "🖼️ Let's restore your old photo! Please upload the photo you want to restore.",
+      "start": "🖼️ Let's generate your image! Please upload the photo you want to transform.",
       "not_an_image": "The file you sent is not an image. Please send a photo or an image file.",
       "crease_removal_error": "⚠️ The system for removing creases and folds is currently unavailable. Would you like to continue with basic photo restoration without crease removal?",
       "continue_without_creases_yes": "Yes, continue",
-      "continue_without_creases_no": "No, cancel"
+      "continue_without_creases_no": "No, cancel",
+      "select_effect_prompt": "✨ Select an AI effect to apply to your image:",
+      "effect_claymation": "🧱 Claymation Cartoon",
+      "effect_ghibli": "🌸 Ghibli Anime",
+      "effect_pixar": "🧩 Pixar Style",
+      "effect_plushify": "🧸 Plush Toy",
+      "effect_ghiblify": "🏯 Early Ghibli",
+      "effect_cartoonify": "🎬 3D Cartoon",
+      "send_photo_for_effect": "🖼️ Great! Now, please send the image you want to transform.",
+      "processing_queued": "⏳ Your request is queued! The AI is warming up... We'll notify you when your masterpiece is ready.",
+      "queue_error": "❌ Sorry, there was an issue adding your request to the queue. Please try again."
     },
     "video": {
       "user_not_found": "User not found. Please start the bot again with /start.",
@@ -73,6 +85,9 @@
       "no_images": "No images found to create a video from. Please generate images first.",
       "images_expired": "Images have expired or have been removed. Please create new images.",
       "image_expired": "This image has expired or has been removed. Please create new images.",
+      "prompt_instructions": "Enter your prompt describing how the video should look, or use our default prompt.\n\nVideo generation costs {{cost}} generations.",
+      "use_default_prompt": "Use Default Prompt",
+      "cancel_button": "Cancel",
       "enter_prompt": "Now enter a prompt describing how you want the video to look and move. Be detailed!",
       "processing": "⏳ Generating your video... This may take up to 1-2 minutes.",
       "completed": "🎬 Your video is ready!",
@@ -108,7 +123,7 @@
       "invite_friend": "👥 Invite Friend",
       "buy_generations": "🛒 Buy Generations",
       "generate_more": "🎨 Generate More",
-      "generate_now": "🖼️ Restore photo now",
+      "generate_now": "🖼️ Generate image now",
       "register": "📝 Register",
       "login": "🔑 Login",
       "upgrade_image": "✨ Upgrade Photo",
@@ -128,7 +143,7 @@
       "success": "🎉 <b>Payment Successful!</b>\n\nYour account has been credited with <b>{{count}}</b> generations worth <b>{{amount}}₽</b>.\n\nThank you for choosing our service! We appreciate your trust and are here to help you restore your precious memories."
     },
     "settings": {
-      "info": "⚙️ <b>Current Settings</b>\n\n• <b>Resolution:</b> {{resolution}} ({{width}}x{{height}})\n• <b>Use Negative Prompt:</b> {{useNegativePrompt}}\n• <b>Use Random Seed:</b> {{useSeed}}\n• <b>Batch Size:</b> {{batchSize}}\n• <b>Language:</b> {{language}}",
+      "info": "⚙️ <b>Current Settings</b>\n\n• <b>Resolution:</b> {{resolution}} ({{width}}x{{height}})\n",
       "change_resolution": "Change Resolution",
       "change_seed": "Toggle Random Seed",
       "change_batch": "Change Batch Size",
@@ -160,7 +175,8 @@
         "toggle_negative_prompt": "Toggle Negative Prompt",
         "toggle_seed": "Toggle Random Seed",
         "change_batch_size": "Change Batch Size",
-        "change_language": "Change Language"
+        "change_language": "Change Language",
+        "restore": "✨ Generate"
       },
       "resolution": {
         "square": "Square (1:1)",
@@ -172,10 +188,7 @@
         "ru": "Russian",
         "en": "English"
       },
-      "info_template": "⚙️ <b>Current Settings</b>\n\n• <b>{{resolution_label}}:</b> {{resolution}} ({{width}}x{{height}})\n• <b>{{negative_prompt_label}}:</b> {{useNegativePrompt}}\n• <b>{{random_seed_label}}:</b> {{useSeed}}\n• <b>{{batch_size_label}}:</b> {{batchSize}}\n• <b>{{language_label}}:</b> {{language}}",
-      "negative_prompt_label": "Negative Prompt",
-      "random_seed_label": "Random Seed",
-      "batch_size_label": "Batch Size",
+      "info_template": "⚙️ <b>Current Settings</b>\n\n• <b>{{resolution_label}}:</b> {{resolution}} ({{width}}x{{height}})\n• <b>{{language_label}}:</b> {{language}}",
       "language_label": "Language"
     },
     "balance": {
@@ -211,16 +224,21 @@
       "no_images_found": "No valid images found for enhancement."
     },
     "subscription": {
-      "not_subscribed": "🙏🏻 You need to subscribe to our channels to use this bot. Please subscribe to all channels below, then click 'Check Subscription', then you can use free restorations.",
+      "not_subscribed": "🙏🏻 You need to subscribe to our channels to use this bot. Please subscribe to all channels below, then click 'Check Subscription', then you can use free generations.",
       "check_button": "🔄 Check Subscription",
       "check_again": "Please make sure you're subscribed to all required channels and try again.",
-      "all_subscribed": "✅ Thank you! You're subscribed to all required channels."
+      "all_subscribed": "✅ Thank you! You're subscribed to all required channels.",
+      "all_subscribed_short": "✅ Subscribed!",
+      "check_again_short": "❌ Not subscribed yet.",
+      "free_generations_granted": "🎉 Welcome! You have been granted {{count}} free generations for subscribing!"
     },
     "keyboard": {
-      "restore": "✨ Restore",
+      "generate": "✨ Generate",
       "balance": "🏦 Balance",
       "referral": "🫂 Referral",
-      "support_menu": "✨ Support"
+      "support_menu": "✨ Support",
+      "restore": "✨ Generate",
+      "settings": "⚙️ Settings"
     },
     "support_menu": {
       "welcome": "✨ <b>Support Menu</b>\n\nSelect a section:",

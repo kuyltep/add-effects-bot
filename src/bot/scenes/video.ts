@@ -7,6 +7,7 @@ import { prisma } from '../../utils/prisma';
 import { GenerationStatus } from '@prisma/client';
 import path from 'path';
 import { addVideoGenerationJob } from '../../queues/videoQueue';
+import { processPrompt } from '../../services/language';
 
 // Create the video scene
 export const videoScene = new Scenes.BaseScene<MyContext>('video');
@@ -79,76 +80,66 @@ videoScene.enter(async (ctx) => {
       return await exitScene(ctx);
     }
 
-    // Show image and effect selection buttons
+    // Show image and prompt for video generation
     await ctx.replyWithPhoto(
       imagePath.startsWith('http') ? imagePath : { source: imagePath },
       {
-        caption: ctx.i18n.t('bot:video.select_effect'),
+        caption: ctx.i18n.t('bot:video.prompt_instructions', { 
+          cost: VIDEO_GENERATION_COST
+        }),
         parse_mode: 'HTML',
         ...Markup.inlineKeyboard([
-          [
-            Markup.button.callback(ctx.i18n.t('bot:video.animation_button'), 'effect_animation'),
-            Markup.button.callback(ctx.i18n.t('bot:video.hug_button'), 'effect_hug')
-          ]
+          [Markup.button.callback(ctx.i18n.t('bot:video.use_default_prompt'), 'use_default_prompt')],
+          [Markup.button.callback(ctx.i18n.t('bot:video.cancel_button'), 'cancel')]
         ])
       }
     );
+    
+    // Set scene state to wait for prompt
+    state.waitingForPrompt = true;
   } catch (error) {
     await handleSceneError(ctx, error, 'video');
   }
 });
 
-// Add handlers for effect selection
-videoScene.action('effect_animation', async (ctx) => {
+// Handle default prompt button
+videoScene.action('use_default_prompt', async (ctx) => {
   await ctx.answerCbQuery();
   const state = ctx.scene.state as VideoSceneState;
-  state.selectedEffect = 'animation';
   
-  await ctx.editMessageCaption(ctx.i18n.t('bot:video.animation_description', {
-    cost: VIDEO_GENERATION_COST
-  }), {
-    parse_mode: 'HTML',
-    ...Markup.inlineKeyboard([
-      [Markup.button.callback(ctx.i18n.t('bot:video.confirm_button'), 'confirm_effect')],
-      [Markup.button.callback(ctx.i18n.t('bot:video.back_button'), 'select_effect')]
-    ])
-  });
+  await processVideoGeneration(ctx, VIDEO_GENERATION_PROMPT, false);
 });
 
-videoScene.action('effect_hug', async (ctx) => {
-  await ctx.answerCbQuery();
+// Handle text messages for custom prompts
+videoScene.on('text', async (ctx, next) => {
   const state = ctx.scene.state as VideoSceneState;
-  state.selectedEffect = 'hug';
   
-  await ctx.editMessageCaption(ctx.i18n.t('bot:video.hug_description', {
-    cost: VIDEO_GENERATION_COST
-  }), {
-    parse_mode: 'HTML',
-    ...Markup.inlineKeyboard([
-      [Markup.button.callback(ctx.i18n.t('bot:video.confirm_button'), 'confirm_effect')],
-      [Markup.button.callback(ctx.i18n.t('bot:video.back_button'), 'select_effect')]
-    ])
-  });
+  // If waiting for prompt, process as a prompt
+  if (state.waitingForPrompt) {
+    const userPrompt = ctx.message.text;
+    
+    // Process the prompt (translate if needed)
+    const processedPrompt = await processPrompt(userPrompt);
+    
+    await processVideoGeneration(
+      ctx, 
+      processedPrompt.translatedPrompt,
+      processedPrompt.isTranslated,
+      processedPrompt.originalPrompt
+    );
+    return;
+  }
+
+  return next();
 });
 
-// Go back to effect selection
-videoScene.action('select_effect', async (ctx) => {
-  await ctx.answerCbQuery();
-  
-  await ctx.editMessageCaption(ctx.i18n.t('bot:video.select_effect'), {
-    parse_mode: 'HTML',
-    ...Markup.inlineKeyboard([
-      [
-        Markup.button.callback(ctx.i18n.t('bot:video.animation_button'), 'effect_animation'),
-        Markup.button.callback(ctx.i18n.t('bot:video.hug_button'), 'effect_hug')
-      ]
-    ])
-  });
-});
-
-// Rename the old confirm handler and add the new one
-videoScene.action('confirm_effect', async (ctx) => {
-  await ctx.answerCbQuery();
+// Helper function to process video generation
+async function processVideoGeneration(
+  ctx: MyContext, 
+  prompt: string, 
+  isTranslated: boolean,
+  originalPrompt?: string
+) {
   const state = ctx.scene.state as VideoSceneState;
   
   if (!state.imagePath) {
@@ -169,12 +160,6 @@ videoScene.action('confirm_effect', async (ctx) => {
   });
   
   try {
-    // Get the appropriate prompt based on the selected effect
-    let prompt = VIDEO_GENERATION_PROMPT;
-    if (state.selectedEffect === 'hug') {
-      prompt = "The characters hug each other, showing warm affection with gentle smiles. Camera fixed";
-    }
-    
     // Create a video generation record
     const videoGeneration = await prisma.generation.create({
       data: {
@@ -193,18 +178,18 @@ videoScene.action('confirm_effect', async (ctx) => {
     // Get user's preferred language
     const userLang = ctx.i18n.locale;
 
-    // Add job to video queue with the effect type
+    // Add job to video queue
     await addVideoGenerationJob({
       userId: user.id,
       generationId: videoGeneration.id,
       imagePath: state.imagePath,
       prompt,
-      translatedPrompt: null,
-      isTranslated: false,
+      translatedPrompt: originalPrompt || null,
+      isTranslated,
       chatId: ctx.chat.id,
       messageId: processingMsg.message_id,
       language: userLang,
-      effect: state.selectedEffect || 'animation'
+      effect: 'animation' // Default effect for backward compatibility
     });
 
     await ctx.telegram.editMessageText(
@@ -229,7 +214,7 @@ videoScene.action('confirm_effect', async (ctx) => {
     await ctx.reply(ctx.i18n.t('bot:video.generation_error'));
     return await exitScene(ctx);
   }
-});
+}
 
 // Handle cancel button
 videoScene.action('cancel', async (ctx) => {
