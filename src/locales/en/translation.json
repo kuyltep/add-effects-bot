@@ -57,7 +57,7 @@
       "remainingGenerations": "Great result! 😎\nYou have {{count}} image generations left\nWant to try again?",
       "uncompressed_files": "📎 Full-size files attached below.",
       "documents_message": "And as files 📂",
-      "watermark": "<a href='https://t.me/{{botUsername}}?start=p_{{referralCode}}'>Created with Avato Memory Bot 📸</a>",
+      "watermark": "<a href='https://t.me/{{botUsername}}?start=p_{{referralCode}}'>Created with Avato Memory Bot 📸</a>\n\nSupported by <a href='https://t.me/avato_ai'>Avato AI 📸</a>",
       "error": "❌ Generation failed. Please try again or contact support: @{{supportUsername}}",
       "creases_question": "Does the photo have visible effects you want to apply?\n\n⚪️ Generate image without effects costs {{cost}} generations\n🟡 Generate image with effects costs {{cost_hard}} generations",
       "yes_button": "Yes - {{cost}} restorations",
@@ -71,7 +71,10 @@
       "select_effect_prompt": "✨ Select an AI effect to apply to your image:",
       "effect_claymation": "🧱 Claymation Cartoon",
       "effect_ghibli": "🌸 Ghibli Anime",
-      "effect_pixar": "🧸 Pixar Style",
+      "effect_pixar": "🧩 Pixar Style",
+      "effect_plushify": "🧸 Plush Toy",
+      "effect_early_ghibli": "🏯 Early Ghibli",
+      "effect_3d_cartoon": "🎬 3D Cartoon",
       "send_photo_for_effect": "🖼️ Great! Now, please send the image you want to transform.",
       "processing_queued": "⏳ Your request is queued! The AI is warming up... We'll notify you when your masterpiece is ready.",
       "queue_error": "❌ Sorry, there was an issue adding your request to the queue. Please try again."
@@ -234,7 +237,8 @@
       "balance": "🏦 Balance",
       "referral": "🫂 Referral",
       "support_menu": "✨ Support",
-      "restore": "✨ Generate"
+      "restore": "✨ Generate",
+      "settings": "⚙️ Settings"
     },
     "support_menu": {
       "welcome": "✨ <b>Support Menu</b>\n\nSelect a section:",
