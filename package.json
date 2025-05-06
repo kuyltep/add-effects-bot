@@ -8,7 +8,8 @@
   "scripts": {
     "dev": "nodemon",
     "build": "npx prisma generate && npx prisma migrate deploy && tsc && cp -r src/locales dist/locales && cd client/admin && yarn install --production=false && yarn build",
-    "start": "node dist/index.js",
+    "start": "nodemon --config nodemon-prod.json",
+    "start:prod": "node dist/index.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
     "format": "prettier --write \"src/**/*.{ts,js}\"",

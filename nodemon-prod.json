@@ -1,0 +1,9 @@
+{
+  "watch": ["dist/**/*.js", ".env"],
+  "ignore": ["node_modules"],
+  "exec": "node --max-old-space-size=1024 dist/index.js",
+  "ext": "js,json",
+  "verbose": false,
+  "signal": "SIGTERM",
+  "delay": 1000
+} 
