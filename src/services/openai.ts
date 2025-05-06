@@ -7,6 +7,7 @@ import { convertToPng, resizeImage } from "./sharp-service";
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
+
 });
 
 // Base prompt template for consistent style transfer
@@ -51,6 +52,7 @@ export async function editImageOpenAI(imagePath: string, effect: string, resolut
       model: process.env.OPENAI_IMAGE_MODEL,
       image: image,
       n: 1,
+      
       prompt: prompts[effect] || "Create a cute stylized hero image",
     });
 

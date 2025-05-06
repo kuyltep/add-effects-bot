@@ -9,9 +9,7 @@ import {
   queueImageGenerationJob
 } from '../../services/generation';
 import { 
-  transitionToScene,
   initializeWizardState,
-  handleSceneError,
   exitScene
 } from '../../services/scene';
 import { Logger } from '../../utils/rollbar.logger';
@@ -42,20 +40,18 @@ async function showEffectSelection(ctx: MyContext): Promise<void> {
     Markup.button.callback(ctx.i18n.t(option.labelKey), `select_effect_${option.key}`)
   );
   
-  // Add Back button
-  buttons.push(Markup.button.callback(ctx.i18n.t('common.cancel'), 'cancel_generation'));
-  
   // Create a keyboard with 2 columns
   const keyboard = [];
-  for (let i = 0; i < buttons.length - 1; i += 2) {
+  for (let i = 0; i < buttons.length; i += 2) {
     const row = [buttons[i]];
-    if (i + 1 < buttons.length - 1) {
+    if (i + 1 < buttons.length) {
       row.push(buttons[i + 1]);
     }
     keyboard.push(row);
   }
+  
   // Add the cancel button in its own row
-  keyboard.push([buttons[buttons.length - 1]]);
+  keyboard.push([Markup.button.callback(ctx.i18n.t('bot:common.cancel'), 'cancel_generation')]);
 
   await ctx.reply(ctx.i18n.t('bot:generate.select_effect_prompt'), {
     parse_mode: 'HTML',
