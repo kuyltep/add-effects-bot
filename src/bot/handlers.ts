@@ -98,7 +98,7 @@ export function setupHelpCommand() {
   });
 }
 
-async function videoHandler(ctx: MyContext) {
+async function videoHandler(ctx: MyContext, scene: "video" | "videoEffect") {
   try {
     // Get user info
     const telegramId = ctx.from?.id.toString() || '';
@@ -139,7 +139,7 @@ async function videoHandler(ctx: MyContext) {
     }
     
     // Enter the video scene with the first image path
-    await ctx.scene.enter('video', { imagePath: imagePaths[0] });
+    await ctx.scene.enter(scene, { imagePath: imagePaths[0] });
     return true;
   } catch (error) {
     console.error('Error handling video command:', error);
@@ -151,7 +151,10 @@ async function videoHandler(ctx: MyContext) {
 // Команда /video - генерация видео из изображений
 export function setupVideoCommand() {
   bot.command('video', async ctx => {
-    await videoHandler(ctx);
+    await videoHandler(ctx, 'video');
+  });
+  bot.command('video_effect', async ctx => {
+    await videoHandler(ctx, 'videoEffect');
   });
 }
 
@@ -277,7 +280,12 @@ export function setupGenerationCallbacks() {
 // Setup generate video button callback
 export function setupVideoCallbacks() {
   bot.action('generate_video', async ctx => {
-    await videoHandler(ctx);
+    await ctx.answerCbQuery();
+    await videoHandler(ctx, 'video');
+  });
+  bot.action('generate_video_effect', async ctx => {
+    await ctx.answerCbQuery();
+    await videoHandler(ctx, 'videoEffect');
   });
 }
 

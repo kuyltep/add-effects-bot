@@ -11,6 +11,7 @@ import { paymentScene } from './scenes/payment';
 import { videoScene } from './scenes/video';
 import { upgradeScene } from './scenes/upgrade';
 import { supportMenuScene } from './scenes/supportMenu';
+import { videoEffectScene } from './scenes/videoEffect';
 import { MyContext } from './types';
 import { prisma } from '../utils/prisma';
 import { i18nMiddleware } from './middleware/i18n';
@@ -39,7 +40,8 @@ const scenes = [
   paymentScene,
   videoScene,
   upgradeScene,
-  supportMenuScene
+  supportMenuScene,
+  videoEffectScene
 ];
 
 // Создаем менеджер сцен
@@ -462,7 +464,7 @@ async function sendEffectResults(data) {
       const generateMoreText = i18next.t('bot:buttons.generate_more', { lng: language });
       const inviteFriendsText = i18next.t('bot:buttons.invite_friend', { lng: language });
       const generateVideoText = i18next.t('bot:buttons.generate_video', { lng: language });
-      const upgradeImageText = i18next.t('bot:buttons.upgrade_image', { lng: language });
+      const videoEffectsText = i18next.t('bot:buttons.video_effects', { lng: language });
       
       const keyboard = Markup.inlineKeyboard([
         [
@@ -471,7 +473,7 @@ async function sendEffectResults(data) {
         ],
         [
           Markup.button.callback(generateVideoText, 'generate_video'),
-          Markup.button.callback(upgradeImageText, 'upgrade_image')
+          Markup.button.callback(videoEffectsText, 'generate_video_effect')
         ]
       ]);
       
@@ -570,6 +572,7 @@ export async function startBot() {
     bot.command('packages', async (ctx) => await ctx.scene.enter('packages'));
     bot.command('video', async (ctx) => await ctx.scene.enter('video'));
     bot.command('upgrade', async (ctx) => await ctx.scene.enter('upgrade'));
+    bot.command('video_effect', async (ctx) => await ctx.scene.enter('videoEffect'));
     
     // Добавляем обработчик для кнопки создания еще
     bot.action('generate_more', async (ctx) => {
@@ -589,7 +592,13 @@ export async function startBot() {
       await ctx.scene.enter('video');
     });
     
-    // Добавляем обработчик для кнопки улучшения изображения
+    // Добавляем обработчик для кнопки добавления видео-эффектов
+    bot.action('video_effect', async (ctx) => {
+      await ctx.answerCbQuery();
+      await ctx.scene.enter('videoEffect');
+    });
+    
+    // Добавляем обработчик для кнопки улучшения изображения (для обратной совместимости)
     bot.action('upgrade_image', async (ctx) => {
       await ctx.answerCbQuery();
       await ctx.scene.enter('upgrade');
@@ -612,7 +621,8 @@ export async function startBot() {
       { command: 'help', description: 'How to use the bot' },
       { command: 'packages', description: 'Buy restoration packages' },
       { command: 'video', description: 'Generate video from restored photo' },
-      { command: 'upgrade', description: 'Enhance photo quality' }
+      { command: 'upgrade', description: 'Enhance photo quality' },
+      { command: 'video_effect', description: 'Apply video effects to photo' }
     ]);
   } catch (error) {
     console.error('Error starting Telegram bot:', error);
