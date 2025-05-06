@@ -88,7 +88,7 @@
       "prompt_instructions": "Enter your prompt describing how the video should look, or use our default prompt.\n\nVideo generation costs {{cost}} generations.",
       "use_default_prompt": "Use Default Prompt",
       "cancel_button": "Cancel",
-      "enter_prompt": "Now enter a prompt describing how you want the video to look and move. Be detailed!",
+      "enter_prompt": "Now enter a prompt describing how you want the video to look and move. Be detailed! 👇",
       "processing": "⏳ Generating your video... This may take up to 1-2 minutes.",
       "completed": "🎬 Your video is ready!",
       "generation_error": "Error generating video. Your generations have been returned. Please try again later.",
@@ -117,7 +117,9 @@
       "animation_description": "Animation effect: Characters will show slight movements, gentle smiles, and natural expressions while maintaining a fixed camera.\nCost - {{cost}} restorations",
       "hug_description": "Hug effect: The characters in the photo will animate to hug each other with warm, affectionate movements. On the photo should be two people.\nCost - {{cost}} restorations",
       "confirm_button": "✅ Confirm",
-      "back_button": "⬅️ Back"
+      "back_button": "⬅️ Back",
+      "animate_button": "🎬 Animate",
+      "use_prompt_button": "💬 Use Custom Prompt"
     },
     "buttons": {
       "invite_friend": "👥 Invite Friend",
@@ -127,7 +129,8 @@
       "register": "📝 Register",
       "login": "🔑 Login",
       "upgrade_image": "✨ Upgrade Photo",
-      "generate_video": "🎬 Generate Video"
+      "generate_video": "🎬 Generate Video",
+      "video_effects": "🎭 Video Effects"
     },
     "packages": {
       "intro": "🛒 <b>Generation Packages</b>\n\nYou currently have <b>{{remainingGenerations}}</b> generations.\n\nSelect a package to purchase more generations:",
@@ -247,6 +250,20 @@
       "button_settings": "⚙️ Settings",
       "button_support": "👥 Support",
       "button_back": "⬅️ Back"
+    },
+    "effects": {
+      "select_effect": "✨ Choose a video effect for your image:\n\nCost - {{cost}} generations",
+      "claymation": "🧱 Claymation",
+      "ghibli": "🌸 Ghibli Style",
+      "pixar": "🧩 Pixar 3D",
+      "plushify": "🧸 Plush Toy",
+      "ghiblify": "🏯 Anime Style",
+      "cartoonify": "🎬 Cartoon",
+      "kiss": "💋 Kiss Me AI",
+      "hug": "🤗 Hug",
+      "jesus": "✝️ Warmth of Jesus",
+      "microwave": "🔥 Microwave",
+      "paired_note": "Note: The effects marked with 👥 require two people in the photo."
     }
   },
   "generation": {

@@ -102,6 +102,16 @@ export const defaultGenerationSettings = {
   model: 'v1',
 };
 
+export const videoConfig = {
+  falEffects: ['hug', 'kiss', 'jesus', 'microwave'],
+  effectMap: {
+    hug: 'Hug',
+    kiss: 'Kiss',
+    jesus: 'Warmth of Jesus',
+    microwave: 'Microwave',
+  },
+}
+
 export default {
   server: serverConfig,
   db: dbConfig,
@@ -113,4 +123,5 @@ export default {
   admin: adminConfig,
   queue: queueConfig,
   defaultGenerationSettings,
+  video: videoConfig,
 };
