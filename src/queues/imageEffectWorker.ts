@@ -6,7 +6,6 @@ import { ImageEffectJobData } from './imageEffectQueue';
 import { GenerationStatus, Resolution } from '@prisma/client';
 import fs from 'fs/promises';
 import path from 'path';
-import sharp from 'sharp';
 import { v4 as uuidv4 } from 'uuid';
 import { createRedisConnection, createRedisPublisher } from '../utils/redis';
 import { applyImageEffect } from '../services/fal-ai';
