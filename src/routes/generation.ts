@@ -15,7 +15,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
           userId: string;
           messageId: string;
           language: string;
-          effect: 'animation' | 'hug';
+          effect: string;
         };
         
         // Validate required parameters
@@ -26,52 +26,44 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
 
         // Get prediction data from request body
         const prediction = request.body as any;
-
-        console.log("PREDICTION");
-        console.log(prediction);
+        request.log.info(`Received video webhook for generation ${generationId}, effect: ${effect}, status: ${prediction?.status || 'unknown'}`);
+        
+        // Log prediction for debugging
+        if (process.env.NODE_ENV !== 'production') {
+          console.log("Prediction data:", JSON.stringify(prediction, null, 2));
+        }
         
         let videoUrl: string | null = null;
-        if (effect === 'animation') {
-        // Validate prediction
-        if (!prediction || !prediction.status) {
-          request.log.error('Invalid prediction data in webhook', prediction);
-          return reply.status(400).send({ error: 'Invalid prediction data' });
-        }
-
-        request.log.info(`Received video webhook for generation ${generationId}, status: ${prediction.status}`);
         
-        // Check if the prediction is completed
-        if (prediction.status === 'succeeded') {
-          // Get the video URL from the output
-          videoUrl = prediction.output;
-          
-
+        // Handle different model responses based on effect type
+        const falEffects = ['hug', 'kiss', 'jesus', 'microwave'];
+        
+        if (falEffects.includes(effect)) {
+          // FAL AI model response format
+          if (prediction?.payload?.video?.url) {
+            videoUrl = prediction.payload.video.url;
+          }
+        } else {
+          // Replicate model response format
+          if (prediction?.status === 'succeeded' && prediction?.output) {
+            videoUrl = prediction.output;
+          }
         }
 
-        }else {
-          console.log(prediction);
-          videoUrl = prediction.payload.video.url;
-        }
-
-        if (!videoUrl) {
-          request.log.error('No video URL in completed prediction', prediction);
-          return reply.status(400).send({ error: 'No video URL in prediction output' });
-        }
-
+        // Process the video if we have a URL
         if (videoUrl) {
-        await processCompletedVideo(
-          generationId,
-          videoUrl,
-          parseInt(chatId, 10),
-          parseInt(messageId, 10),
-          language || 'en'
-        );
-        return reply.send({ success: true });
-
-      }
+          await processCompletedVideo(
+            generationId,
+            videoUrl,
+            parseInt(chatId, 10),
+            parseInt(messageId, 10),
+            language || 'en'
+          );
+          return reply.send({ success: true });
+        }
         
         // If prediction failed
-        if (prediction.status.toLowerCase() === 'failed') {
+        if (prediction?.status?.toLowerCase() === 'failed' || prediction?.status?.toLowerCase() === 'error') {
           // Update generation status
           await prisma.generation.update({
             where: { id: generationId },
@@ -96,7 +88,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
         }
         
         // For other statuses, just acknowledge
-        return reply.send({ success: true, status: prediction.status });
+        return reply.send({ success: true, status: prediction?.status || 'processing' });
       } catch (error) {
         request.log.error('Error processing video webhook', error);
         return reply.status(500).send({ error: 'Failed to process webhook' });

@@ -88,6 +88,7 @@ export interface VideoSceneState {
   prompt?: string;
   selectedEffect?: string;
   waitingForPrompt?: boolean;
+  messageId?: number;  // Store message ID for deletion
 }
 
 /**

@@ -4,16 +4,14 @@ import { v4 as uuidv4 } from 'uuid';
 import { publishMessage, publishBatch } from '../utils/redis';
 import { prisma } from '../utils/prisma';
 import { GenerationStatus } from '@prisma/client';
-import { readFile} from "fs/promises";
-import { fal } from "@fal-ai/client";
 import path from "path";
-
-// Log token first few chars for debugging
+import { generateVideoWithFalEffect } from "./fal-ai";
 
 export const replicate = new Replicate({auth: process.env.REPLICATE_API_TOKEN});
 
 // Base API URL for webhook callbacks
 const API_BASE_URL = process.env.API_BASE_URL;
+
 
 /**
  * Enhance image quality using Aura SR model
@@ -105,27 +103,7 @@ async function generateVideoWithMoveEffect(imagePathOrUrl: string, prompt: strin
   return prediction.id;
 }
 
-async function generateVideoWithHugEffect(imagePathOrUrl: string, prompt: string, generationId: string, chatId: number, userId: string, messageId: number, language: string = 'en', effect: string = 'hug'): Promise<string> {
-  console.log(imagePathOrUrl)
-  const imageBase64 = (await readFile(imagePathOrUrl));
-  const file = new File([imageBase64], path.basename(imagePathOrUrl), { type: getMimeType(imagePathOrUrl) });
-  const webhookId = uuidv4();
-  const webhookUrl = `${API_BASE_URL}/api/generation/video-webhook/${webhookId}?generationId=${generationId}&chatId=${chatId}&userId=${userId}&messageId=${messageId}&language=${language}&effect=${effect}`;
-  const url = await fal.storage.upload(file);
-  console.log(url)
-  const { request_id } = await fal.queue.submit("fal-ai/pixverse/v4/effects", {
-    input: {
-      effect: "Hug",
-      image_url: url,
-      resolution: "720p",
-      duration: "5"
-    },
-    webhookUrl: webhookUrl,
-  });
 
-
-  return request_id;
-}
 
 export async function generateVideoFromImage(
   imagePathOrUrl: string, 
@@ -138,15 +116,33 @@ export async function generateVideoFromImage(
   effect: string = 'animation'
 ): Promise<string> {
   try {
-    if (effect === 'animation') {
-      return await generateVideoWithMoveEffect(imagePathOrUrl, prompt, generationId, chatId, userId, messageId, language, effect);
-    } else if (effect === 'hug') {
-      return await generateVideoWithHugEffect(imagePathOrUrl, prompt, generationId, chatId, userId, messageId, language, effect);
+    // Determine which generation function to use based on effect type
+    const {videoConfig: {falEffects}} = await import('../config');
+    
+    if (falEffects.includes(effect)) {
+      return await generateVideoWithFalEffect(
+        imagePathOrUrl, 
+        prompt, 
+        generationId, 
+        chatId, 
+        userId, 
+        messageId, 
+        language, 
+        effect
+      );
     } else {
-      throw new Error(`Invalid effect: ${effect}`);
+      // Default to animation/claymation/etc effects via Replicate
+      return await generateVideoWithMoveEffect(
+        imagePathOrUrl, 
+        prompt, 
+        generationId, 
+        chatId, 
+        userId, 
+        messageId, 
+        language, 
+        effect
+      );
     }
-    // Check if the path is a URL or a local file
-
   } catch (error) {
     console.error('Error generating video:', error);
     throw new Error(`Video generation failed: ${error.message}`);

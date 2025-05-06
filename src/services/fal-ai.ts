@@ -1,6 +1,6 @@
 import { EffectType } from '../types';
 import { Logger } from '../utils/rollbar.logger';
-import fs from 'fs/promises';
+import fs, { readFile } from 'fs/promises';
 import path from 'path';
 import { fal } from "@fal-ai/client";
 import { getMimeType } from './replicate';
@@ -16,6 +16,8 @@ export function initializeFalClient() {
 }
 
 initializeFalClient();
+
+const API_BASE_URL = process.env.API_BASE_URL;
 
 // Define FAL model mappings for different effects
 const effectModelMap: Record<string, string> = {
@@ -74,3 +76,55 @@ export async function applyImageEffect(imagePath: string, effect: EffectType, re
     throw error;
   }
 } 
+
+export async function generateVideoWithFalEffect(imagePathOrUrl: string, prompt: string, generationId: string, chatId: number, userId: string, messageId: number, language: string = 'en', effect: string = 'hug'): Promise<string> {
+  try {
+    let imageData;
+    
+    if (imagePathOrUrl.startsWith('http')) {
+      // If it's a URL, download the image
+      const response = await fetch(imagePathOrUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to download image: ${response.statusText}`);
+      }
+      const imageBuffer = await response.arrayBuffer();
+      imageData = new File([Buffer.from(imageBuffer)], 'image.jpg', { type: 'image/jpeg' });
+    } else {
+      // If it's a local file, read it and create a File object
+      const imageBuffer = await readFile(imagePathOrUrl);
+      imageData = new File([imageBuffer], path.basename(imagePathOrUrl), { type: getMimeType(imagePathOrUrl) });
+    }
+    
+    const { v4: uuidv4 } = await import('uuid');
+    // Create unique webhook ID for callback
+    const webhookId = uuidv4();
+    const webhookUrl = `${API_BASE_URL}/api/generation/video-webhook/${webhookId}?generationId=${generationId}&chatId=${chatId}&userId=${userId}&messageId=${messageId}&language=${language}&effect=${effect}`;
+    
+    // Upload file to FAL storage
+    const url = await fal.storage.upload(imageData);
+    console.log(`Image uploaded to FAL storage: ${url}`);
+    
+    // Map effect string to FAL API effect name
+    const {videoConfig: {effectMap}} = await import('../config');
+    
+    const falEffect = effectMap[effect] || 'Hug';
+    
+    // Submit job to FAL AI pixverse model
+    const { request_id } = await fal.queue.submit("fal-ai/pixverse/v4/effects", {
+      input: {
+        effect: falEffect,
+        image_url: url,
+        resolution: "720p",
+        duration: "5"
+      },
+      webhookUrl: webhookUrl,
+    });
+    
+    console.log(`FAL AI job submitted with request ID: ${request_id} and effect: ${falEffect}`);
+    
+    return request_id;
+  } catch (error) {
+    console.error(`Error generating video with FAL effect ${effect}:`, error);
+    throw error;
+  }
+}

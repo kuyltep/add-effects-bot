@@ -9,7 +9,7 @@ function getSupportMenuKeyboard(ctx: MyContext) {
   return Markup.inlineKeyboard([
     [Markup.button.callback(ctx.i18n.t('bot:support_menu.button_help', { locale: lang }), 'action_help')],
     [Markup.button.callback(ctx.i18n.t('bot:support_menu.button_links', { locale: lang }), 'action_links')],
-    [Markup.button.url(ctx.i18n.t('bot:support_menu.button_support', { locale: lang }), `https://t.me/avato_memory_help_bot`)],
+    [Markup.button.url(ctx.i18n.t('bot:support_menu.button_support', { locale: lang }), `https://t.me/${process.env.TELEGRAM_SUPPORT_USERNAME}`)],
     // [Markup.button.callback(ctx.i18n.t('bot:support_menu.button_settings'), 'action_settings')],
     [Markup.button.callback(ctx.i18n.t('bot:support_menu.button_back', { locale: lang }), 'action_back')]
   ]);

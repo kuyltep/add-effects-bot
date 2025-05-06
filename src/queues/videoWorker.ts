@@ -4,7 +4,7 @@ import { GenerationStatus } from '@prisma/client';
 import { prisma } from '../utils/prisma';
 import { createRedisConnection, createRedisPublisher } from '../utils/redis';
 import fs from 'fs';
-import { enhanceImage, generateVideoFromImage } from '../services/replicate';
+import {  generateVideoFromImage } from '../services/replicate';
 import i18next from '../i18n';
 import { isMainThread, parentPort, workerData } from 'worker_threads';
 
@@ -61,17 +61,21 @@ async function processVideoJob(job: Job<VideoGenerationJob>): Promise<VideoResul
       throw new Error('Image file not found');
     }
 
-    // Update the user that image enhancement has started
+    // Update the user that processing has started
     await sendStatusUpdate(jobData, 'enhancing');
     
     try {
-      // Enhance the image - now returns URL directly
-      // Update that enhancement is complete and video generation has started
-      await sendStatusUpdate(jobData, 'enhancement_complete');
+      // Determine if we need to enhance the image based on effect type
+      // FAL AI effects don't need enhancement - they work directly with the image
+      
+      let processedImagePath = imagePath;
+      
+      // Only enhance image for non-FAL effects
+
       
       // Start video generation with webhook - returns prediction ID
       const predictionId = await generateVideoFromImage(
-        imagePath,
+        processedImagePath,
         translatedPrompt || prompt,
         generationId,
         chatId,
@@ -81,7 +85,7 @@ async function processVideoJob(job: Job<VideoGenerationJob>): Promise<VideoResul
         effect
       );
 
-
+      // Deduct generations from user's balance
       await prisma.user.update({
         where: { id: userId },
         data: {
@@ -90,6 +94,7 @@ async function processVideoJob(job: Job<VideoGenerationJob>): Promise<VideoResul
           }
         }
       });
+      
       // Update the generation record with the prediction ID
       await prisma.generation.update({
         where: { id: generationId },
@@ -105,7 +110,7 @@ async function processVideoJob(job: Job<VideoGenerationJob>): Promise<VideoResul
         predictionId
       };
     } catch (enhanceError) {
-      console.error('Error during image enhancement or video generation:', enhanceError);
+      console.error('Error during image processing or video generation:', enhanceError);
       throw new Error(`Video processing failed: ${enhanceError.message}`);
     }
   } catch (error) {
