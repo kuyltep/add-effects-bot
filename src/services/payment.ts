@@ -150,9 +150,7 @@ export async function processRobokassaPayment(
       
       // Get user with telegram ID
       const user = await prisma.user.findUnique({
-        where: { id: payment.userId },
-        select: { telegramId: true }
-      });
+        where: { id: payment.userId }      });
       
       // Send notification via Redis
       await sendPaymentSuccessNotification({
@@ -166,7 +164,9 @@ export async function processRobokassaPayment(
       await notifyExternalPaymentService({
         amount: payment.amount,
         generationsAdded: payment.generationsAdded,
-        botName: process.env.BOT_USERNAME || ''
+        botName: process.env.BOT_USERNAME || '',
+        user: user.telegramId,
+        username: user.telegramUsername
       });
     }
 
@@ -325,6 +325,8 @@ async function notifyExternalPaymentService(data: {
   amount: number;
   generationsAdded: number;
   botName: string;
+  user: string;
+  username: string
 }): Promise<void> {
   try {
     const paymentNotifyServiceUrl = process.env.PAYMENT_NOTIFY_SERVICE_URL;
