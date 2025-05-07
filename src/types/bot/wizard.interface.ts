@@ -67,7 +67,8 @@ export type SceneName =
   | 'packages'
   | 'payment'
   | 'video'
-  | 'upgrade';
+  | 'upgrade' 
+  | "supportMenu";
 
 /**
  * Settings wizard state interface

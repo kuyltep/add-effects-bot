@@ -59,6 +59,8 @@ export enum SceneType {
   PACKAGES = 'packages',
   PAYMENT = 'payment',
   BALANCE = 'balance',
+  ACCOUNT = 'account',
+  SUPPORT_MENU = 'supportMenu',
   VIDEO = 'video',
   UPGRADE = 'upgrade',
 }
@@ -87,8 +89,10 @@ export interface VideoSceneState {
   selectedImagePath?: string;
   prompt?: string;
   selectedEffect?: string;
+  customPrompt?: string;
   waitingForPrompt?: boolean;
   messageId?: number;  // Store message ID for deletion
+  source?: 'command' | 'generate';  // Track where the user entered from
 }
 
 /**
