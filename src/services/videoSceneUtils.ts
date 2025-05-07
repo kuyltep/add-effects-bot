@@ -43,26 +43,47 @@ export const getAbsolutePath = (filePath: string): string => {
  * @returns User object if valid, null otherwise
  */
 export const validateUser = async (ctx: MyContext) => {
-  const userId = ctx.from.id.toString();
-  const user = await ctx.prisma.user.findUnique({
-    where: { telegramId: userId }
-  });
+  try {
+    if (!ctx || !ctx.from) {
+      console.error('Context or ctx.from is undefined in validateUser');
+      return null;
+    }
 
-  if (!user) {
-    await ctx.reply(ctx.i18n.t('bot:video.user_not_found'));
+    const userId = ctx.from.id.toString();
+    
+    // Use either the context's prisma client or the imported one
+    const prismaClient = ctx.prisma || prisma;
+    
+    if (!prismaClient) {
+      console.error('Both context prisma and imported prisma are undefined');
+      await ctx.reply('An error occurred with the database connection. Please try again later.');
+      return null;
+    }
+
+    const user = await prismaClient.user.findUnique({
+      where: { telegramId: userId }
+    });
+
+    if (!user) {
+      await ctx.reply(ctx.i18n.t('bot:video.user_not_found'));
+      return null;
+    }
+
+    // Check if user has enough balance
+    if (user.remainingGenerations < VIDEO_GENERATION_COST) {
+      await ctx.reply(ctx.i18n.t('bot:video.insufficient_balance', { 
+        cost: VIDEO_GENERATION_COST,
+        balance: user.remainingGenerations
+      }));
+      return null;
+    }
+
+    return user;
+  } catch (error) {
+    console.error('Error in validateUser:', error);
+    await ctx.reply('An error occurred. Please try again later.');
     return null;
   }
-
-  // Check if user has enough balance
-  if (user.remainingGenerations < VIDEO_GENERATION_COST) {
-    await ctx.reply(ctx.i18n.t('bot:video.insufficient_balance', { 
-      cost: VIDEO_GENERATION_COST,
-      balance: user.remainingGenerations
-    }));
-    return null;
-  }
-
-  return user;
 };
 
 /**
@@ -72,25 +93,31 @@ export const validateUser = async (ctx: MyContext) => {
  * @returns Resolved image path or null if invalid
  */
 export const resolveImagePath = async (ctx: MyContext, state: VideoSceneState): Promise<string | null> => {
-  // Support both imagePath and imagePaths for backward compatibility
-  let imagePath = state.imagePath;
-  if (!imagePath && state.imagePaths && state.imagePaths.length > 0) {
-    imagePath = state.imagePaths[0];
-    state.imagePath = imagePath;
-  }
-  
-  if (!imagePath) {
-    await ctx.reply(ctx.i18n.t('bot:video.no_images'));
-    return null;
-  }
-  
-  // Validate image path
-  if (!imagePath.startsWith('http') && !fileExists(getAbsolutePath(imagePath))) {
-    await ctx.reply(ctx.i18n.t('bot:video.image_expired'));
-    return null;
-  }
+  try {
+    // Support both imagePath and imagePaths for backward compatibility
+    let imagePath = state.imagePath;
+    if (!imagePath && state.imagePaths && state.imagePaths.length > 0) {
+      imagePath = state.imagePaths[0];
+      state.imagePath = imagePath;
+    }
+    
+    if (!imagePath) {
+      await ctx.reply(ctx.i18n.t('bot:video.no_images'));
+      return null;
+    }
+    
+    // Validate image path
+    if (!imagePath.startsWith('http') && !fileExists(getAbsolutePath(imagePath))) {
+      await ctx.reply(ctx.i18n.t('bot:video.image_expired'));
+      return null;
+    }
 
-  return imagePath;
+    return imagePath;
+  } catch (error) {
+    console.error('Error resolving image path:', error);
+    await ctx.reply('An error occurred while accessing your image. Please try again.');
+    return null;
+  }
 };
 
 /**
@@ -98,86 +125,112 @@ export const resolveImagePath = async (ctx: MyContext, state: VideoSceneState): 
  * @param ctx Telegram context
  * @param effect Effect type to apply
  * @param prompt Prompt for the video generation
+ * @param fileId Optional Telegram file ID for direct upload
  */
 export const processVideoGeneration = async (
   ctx: MyContext,
   effect: string,
   prompt: string,
+  fileId?: string,
   translatedPrompt: string | null = null,
   isTranslated: boolean = false,
 ): Promise<void> => {
-  const state = ctx.scene.state as VideoSceneState;
-  
-  if (!state.imagePath) {
-    await ctx.reply(ctx.i18n.t('bot:video.image_expired'));
-    return await exitScene(ctx);
-  }
-  
-  // Show queued message
-  const processingMsg = await ctx.reply(ctx.i18n.t('bot:video.queued'));
-  
-  // Get user ID
-  const userId = ctx.from.id.toString();
-  const user = await prisma.user.findFirst({
-    where: { telegramId: userId },
-    select: { id: true }
-  });
-  
   try {
-    // Create a video generation record
-    const videoGeneration = await prisma.generation.create({
-      data: {
-        userId: user.id,
-        prompt,
-        model: "video",
-        seed: -1,
-        width: 1024,
-        height: 1024,
-        batchSize: 1,
-        imageUrls: [],
-        status: GenerationStatus.PROCESSING,
-      }
-    });
-
-    // Get user's preferred language
-    const userLang = ctx.i18n.locale;
-
-    // Add job to video queue
-    await addVideoGenerationJob({
-      userId: user.id,
-      generationId: videoGeneration.id,
-      imagePath: state.imagePath,
-      prompt,
-      translatedPrompt: translatedPrompt,
-      isTranslated,
-      chatId: ctx.chat.id,
-      messageId: processingMsg.message_id,
-      language: userLang,
-      effect
-    });
-
-    await ctx.telegram.editMessageText(
-      ctx.chat.id,
-      processingMsg.message_id,
-      undefined,
-      ctx.i18n.t('bot:video.processing_queued')
-    );
+    const state = ctx.scene.state as VideoSceneState;
     
-    return await exitScene(ctx);
-  } catch (error) {
-    console.error('Video generation error:', error);
+    // Check if we have either an image path or a file ID
+    if (!state.imagePath && !fileId) {
+      await ctx.reply(ctx.i18n.t('bot:video.image_expired'));
+      return await exitScene(ctx);
+    }
     
-    // Refund the user's generations
-    await ctx.prisma.user.update({
-      where: { id: user.id },
-      data: {
-        remainingGenerations: {
-          increment: VIDEO_GENERATION_COST
+    // Show queued message
+    const processingMsg = await ctx.reply(ctx.i18n.t('bot:video.queued'));
+    
+    // Get user ID
+    const userId = ctx.from.id.toString();
+    
+    // Use either the context's prisma client or the imported one
+    const prismaClient = ctx.prisma || prisma;
+    
+    const user = await prismaClient.user.findFirst({
+      where: { telegramId: userId },
+      select: { id: true }
+    });
+    
+    if (!user) {
+      await ctx.reply(ctx.i18n.t('bot:video.user_not_found'));
+      return await exitScene(ctx);
+    }
+    
+    try {
+      // Create a video generation record
+      const videoGeneration = await prismaClient.generation.create({
+        data: {
+          userId: user.id,
+          prompt,
+          model: "video",
+          seed: -1,
+          width: 1024,
+          height: 1024,
+          batchSize: 1,
+          imageUrls: [],
+          status: GenerationStatus.PROCESSING,
         }
+      });
+  
+      // Get user's preferred language
+      const userLang = ctx.i18n.locale;
+  
+      // Add job to video queue
+      await addVideoGenerationJob({
+        userId: user.id,
+        generationId: videoGeneration.id,
+        imagePath: state.imagePath,
+        fileId: fileId,
+        prompt,
+        translatedPrompt: translatedPrompt,
+        isTranslated,
+        chatId: ctx.chat.id,
+        messageId: processingMsg.message_id,
+        language: userLang,
+        effect,
+        source: state.source
+      });
+  
+      await ctx.telegram.editMessageText(
+        ctx.chat.id,
+        processingMsg.message_id,
+        undefined,
+        ctx.i18n.t('bot:video.processing_queued')
+      );
+      
+      return await exitScene(ctx);
+    } catch (error) {
+      console.error('Video generation error:', error);
+      
+      // Refund the user's generations
+      try {
+        if (user && prismaClient) {
+          await prismaClient.user.update({
+            where: { id: user.id },
+            data: {
+              remainingGenerations: {
+                increment: VIDEO_GENERATION_COST
+              }
+            }
+          });
+        }
+      } catch (refundError) {
+        console.error('Error refunding generations:', refundError);
       }
-    });
-    
-    await ctx.reply(ctx.i18n.t('bot:video.generation_error'));
+      
+      await ctx.reply(ctx.i18n.t('bot:video.generation_error'));
+      return await exitScene(ctx);
+    }
+  } catch (outerError) {
+    console.error('Fatal error in processVideoGeneration:', outerError);
+    await ctx.reply('An unexpected error occurred. Please try again later.');
     return await exitScene(ctx);
   }
 }; 

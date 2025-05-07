@@ -10,8 +10,8 @@ const MAIN_KEYBOARD_MAPPING = {
   // Russian buttons
   '✨ Создать': 'generate',
   '✨ Генерация': 'generate',
-  '🏦 Баланс': 'balance',
   '🫂 Рефералка': 'referral',
+  '👤 Аккаунт': 'account',
   '✨ Помощь': 'supportMenu',
   '⚙️ Настройки': 'settings',
   
@@ -19,6 +19,7 @@ const MAIN_KEYBOARD_MAPPING = {
   '✨ Generate': 'generate',
   '🏦 Balance': 'balance',
   '🫂 Referral': 'referral',
+  '👤 Account': 'account',
   '✨ Help': 'supportMenu',
   '⚙️ Settings': 'settings',
 };
