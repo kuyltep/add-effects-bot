@@ -1,6 +1,5 @@
 import { Language, Resolution, UserSettings } from '@prisma/client';
 import { prisma } from '../utils/prisma';
-import { MyContext } from '../types/bot/context.interface';
 import { Markup } from 'telegraf';
 import { Logger } from '../utils/rollbar.logger';
 import i18next from 'i18next';
@@ -93,6 +92,10 @@ export function createSettingsKeyboard(locale: string) {
       'change_resolution'
     )],
 
+    [Markup.button.callback(
+      i18next.t('bot:keyboard.support_menu', { lng: locale }),
+      'support_menu'
+    )]
   ]);
 }
 

@@ -9,14 +9,12 @@ export function getMainKeyboard(locale: string = 'ru') {
   return Markup.keyboard([
     [
       Markup.button.text(i18next.t('bot:keyboard.generate', { lng: currentLocale })),
+      Markup.button.text(i18next.t('bot:keyboard.account', { lng: currentLocale })),
     ],
     [
-      Markup.button.text(i18next.t('bot:keyboard.balance', { lng: currentLocale })),
       Markup.button.text(i18next.t('bot:keyboard.referral', { lng: currentLocale })),
-    ],
-    [
-      Markup.button.text(i18next.t('bot:keyboard.support_menu', { lng: currentLocale })),
       Markup.button.text(i18next.t('bot:keyboard.settings', { lng: currentLocale })),
     ],
+
   ]).resize();
 } 

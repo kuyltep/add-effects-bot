@@ -24,9 +24,9 @@ export function setupReferralCommand() {
 }
 
 // Команда /balance - баланс и подписка
-export function setupBalanceCommand() {
-  bot.command('balance', async ctx => {
-    return ctx.scene.enter('balance');
+export function setupAccountCommand() {
+  bot.command('account', async ctx => {
+    return ctx.scene.enter('account');
   });
 }
 
@@ -95,6 +95,10 @@ export function setupCheckSubscriptionCommand() {
 export function setupHelpCommand() {
   bot.command('help', async ctx => {
     return ctx.scene.enter('help');
+  });
+  bot.action('support_menu', async ctx => {
+    await ctx.answerCbQuery();
+    return ctx.scene.enter('supportMenu');
   });
 }
 
@@ -174,10 +178,10 @@ export function setupKeyboardHandlers() {
     const sceneKeyMap: { [key: string]: string } = {
       // Note: The scene name for restore is 'generate'
       generate: 'bot:keyboard.generate',
-      balance: 'bot:keyboard.balance',
       referral: 'bot:keyboard.referral',
       supportMenu: 'bot:keyboard.support_menu',
       settings: 'bot:keyboard.settings',
+      account: 'bot:keyboard.account',
     };
 
     let targetScene: string | null = null;
@@ -359,7 +363,7 @@ export function setupUpgradeCommand() {
 export function setupAllHandlers() {
   setupStartCommand();
   setupReferralCommand();
-  setupBalanceCommand();
+  setupAccountCommand();
   setupGenerateCommand();
   setupSettingsCommand();
   setupHelpCommand();

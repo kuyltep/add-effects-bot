@@ -46,7 +46,7 @@ export const settingsScene = new Scenes.WizardScene<MyContext>(
 );
 
 // Global command handlers to exit scene
-settingsScene.command(['cancel', 'start', 'help', 'generate', 'balance', 'referral', 'settings'], async (ctx) => {
+settingsScene.command(['cancel', 'start', 'generate', 'account', 'referral', 'settings'], async (ctx) => {
   const cmd = ctx.message.text.split(' ')[0].substring(1);
   if (cmd === 'cancel') {
     await ctx.reply(ctx.i18n.t('bot:settings.cancelled'));
@@ -137,6 +137,8 @@ async function handleSettingsOption(ctx: MyContext): Promise<any> {
       return handleChangeResolution(ctx);
     case 'change_language':
       return handleChangeLanguage(ctx);
+    case 'support_menu':
+      return ctx.scene.enter('supportMenu');
     default:
       Logger.error(`Unknown action in settings`, { 
         action: callbackData,

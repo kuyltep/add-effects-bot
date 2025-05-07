@@ -2,7 +2,7 @@ import { Telegraf, Markup, Context, Scenes, session } from 'telegraf';
 import { generateScene } from './scenes/generate';
 import { settingsScene } from './scenes/settings';
 import { startScene } from './scenes/start';
-import { balanceScene } from './scenes/balance';
+import { accountScene } from './scenes/account';
 import { referralScene } from './scenes/referral';
 import { helpScene } from './scenes/help';
 import { linksScene } from './scenes/links';
@@ -31,8 +31,9 @@ export const bot = new Telegraf<MyContext>(process.env.TELEGRAM_BOT_TOKEN || '')
 const scenes = [
   generateScene, 
   settingsScene,
+  supportMenuScene,
   startScene,
-  balanceScene,
+  accountScene,
   referralScene,
   helpScene,
   linksScene,
@@ -40,7 +41,6 @@ const scenes = [
   paymentScene,
   videoScene,
   upgradeScene,
-  supportMenuScene,
   videoEffectScene
 ];
 
@@ -216,31 +216,56 @@ function setupRedisSubscriber() {
 // Function to send video to user
 async function sendVideoToUser(data) {
   try {
-    const { chatId, videoUrl, caption } = data;
+    const { chatId, videoUrl, caption, parseMode = 'HTML', language, userId, remainingGenerations, source } = data;
     
     if (!chatId || !videoUrl) {
       console.error('Missing required data for sending video');
       return;
     }
     
-    
     // Send the video with caption
     if (videoUrl.startsWith('http')) {
       // If URL, send directly
-    await bot.telegram.sendVideo(chatId, videoUrl, {
-      caption: caption,
-      parse_mode: 'HTML'
-    });
+      await bot.telegram.sendVideo(chatId, videoUrl, {
+        caption: caption,
+        parse_mode: parseMode
+      });
     } else if (fs.existsSync(videoUrl)) {
       // If local file, send from disk
       await bot.telegram.sendVideo(chatId, { source: videoUrl }, {
         caption: caption,
-        parse_mode: 'HTML'
+        parse_mode: parseMode
       });
     } else {
       throw new Error(`Video file not found: ${videoUrl}`);
     }
     
+    // If we have user ID and remaining generations, send the buttons
+    if (userId && typeof remainingGenerations !== 'undefined') {
+      // Send remaining generations info with buttons
+      const remainingGenerationsText = language === 'ru'
+        ? `Отлично получилось 😎\nОсталось генераций: ${remainingGenerations}`
+        : `Great job 😎\nRemaining generations: ${remainingGenerations}`;
+      
+      // Button labels based on language
+      const generateMoreText = language === 'ru' ? '✨ Сгенерировать еще картинку' : '✨ Generate More Pictures';
+      const videoEffectsText = language === 'ru' ? '🎭 Другие эффекты' : '🎭 Other Effects';
+      
+      // Use the appropriate callback data for video effects based on source
+      const videoEffectsCallbackData = source === 'generate' 
+        ? 'video_effect_from_generate' 
+        : 'generate_video_effect';
+      
+      await bot.telegram.sendMessage(chatId, remainingGenerationsText, {
+        parse_mode: 'HTML',
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: generateMoreText, callback_data: 'generate_more' }],
+            [{ text: videoEffectsText, callback_data: videoEffectsCallbackData }]
+          ]
+        }
+      });
+    }
   } catch (error) {
     console.error('Error sending video to user:', error);
     
@@ -248,7 +273,9 @@ async function sendVideoToUser(data) {
       if (data.chatId) {
         await bot.telegram.sendMessage(
           data.chatId,
-          '❌ Error sending video. Please try again later.',
+          data.language === 'ru' 
+            ? '❌ Ошибка при отправке видео. Пожалуйста, попробуйте позже.' 
+            : '❌ Error sending video. Please try again later.',
           { parse_mode: 'HTML' }
         );
       }
@@ -534,24 +561,6 @@ export async function stopBot() {
   console.log('Bot stopped.');
 }
 
-// Function to generate the main keyboard layout based on locale
-// export function getMainKeyboard(locale: string = 'ru') {
-//   // Ensure locale exists in i18next resources
-//   const currentLocale = i18next.exists(locale) ? locale : 'ru';
-  
-//   return Markup.keyboard([
-//     [
-//       Markup.button.text(i18next.t('bot:menu.generate', { lng: currentLocale })),
-//       Markup.button.text(i18next.t('bot:menu.balance', { lng: currentLocale }))
-//     ],
-//     [
-//       Markup.button.text(i18next.t('bot:menu.subscription', { lng: currentLocale })),
-//       Markup.button.text(i18next.t('bot:menu.referral', { lng: currentLocale })),
-//       Markup.button.text(i18next.t('bot:menu.settings', { lng: currentLocale }))
-//     ],
-//     [Markup.button.text(i18next.t('bot:menu.help', { lng: currentLocale }))]
-//   ]).resize();
-// }
 
 export async function startBot() {
   try {
@@ -565,14 +574,14 @@ export async function startBot() {
     bot.command('start', async (ctx) => await ctx.scene.enter('start'));
     bot.command('generate', async (ctx) => await ctx.scene.enter('generate'));
     bot.command('settings', async (ctx) => await ctx.scene.enter('settings'));
-    bot.command('balance', async (ctx) => await ctx.scene.enter('balance'));
+    bot.command('account', async (ctx) => await ctx.scene.enter('account'));
     bot.command('referral', async (ctx) => await ctx.scene.enter('referral'));
     bot.command('help', async (ctx) => await ctx.scene.enter('help'));
     bot.command('links', async (ctx) => await ctx.scene.enter('links'));
     bot.command('packages', async (ctx) => await ctx.scene.enter('packages'));
     bot.command('video', async (ctx) => await ctx.scene.enter('video'));
     bot.command('upgrade', async (ctx) => await ctx.scene.enter('upgrade'));
-    bot.command('video_effect', async (ctx) => await ctx.scene.enter('videoEffect'));
+    bot.command('video_effect', async (ctx) => await ctx.scene.enter('videoEffect', { source: 'command' }));
     
     // Добавляем обработчик для кнопки создания еще
     bot.action('generate_more', async (ctx) => {
@@ -593,9 +602,9 @@ export async function startBot() {
     });
     
     // Добавляем обработчик для кнопки добавления видео-эффектов
-    bot.action('video_effect', async (ctx) => {
+    bot.action('generate_video_effect', async (ctx) => {
       await ctx.answerCbQuery();
-      await ctx.scene.enter('videoEffect');
+      await ctx.scene.enter('videoEffect', { source: 'command' });
     });
     
     // Добавляем обработчик для кнопки улучшения изображения (для обратной совместимости)
@@ -610,12 +619,24 @@ export async function startBot() {
       await ctx.scene.enter('packages');
     });
     
+    // Добавляем обработчик для кнопки видео-эффектов
+    bot.action('video_effect', async (ctx) => {
+      await ctx.answerCbQuery();
+      await ctx.scene.enter('videoEffect', { source: 'command' });
+    });
+    
+    // Adding a handler for video effects from generate scene
+    bot.action('video_effect_from_generate', async (ctx) => {
+      await ctx.answerCbQuery();
+      await ctx.scene.enter('videoEffect', { source: 'generate' });
+    });
+    
       await bot.launch();
 
     await bot.telegram.setMyCommands([
       { command: 'start', description: 'Start the bot' },
       { command: 'referral', description: 'Referral program' },
-      { command: 'balance', description: 'Check your balance' },
+      { command: 'account', description: 'Check your account' },
       { command: 'generate', description: 'Generate a new photo' },
       { command: 'settings', description: 'Bot settings' },
       { command: 'help', description: 'How to use the bot' },
