@@ -62,7 +62,7 @@ export async function enhanceImage(imagePath: string): Promise<string> {
  * @returns Prediction ID from Replicate
  */
 
-async function generateVideoWithMoveEffect(imagePathOrUrl: string, prompt: string, generationId: string, chatId: number, userId: string, messageId: number, language: string = 'en', effect: string = 'animation'): Promise<string> {
+async function generateVideoWithMoveEffect(imagePathOrUrl: string, prompt: string, generationId: string, chatId: number, userId: string, messageId: number, language: string = 'en', effect: string = 'animation', source?: string): Promise<string> {
   let imageBase64;
   
   
@@ -84,7 +84,7 @@ async function generateVideoWithMoveEffect(imagePathOrUrl: string, prompt: strin
   // Create unique webhook ID
   const webhookId = uuidv4();
   
-  const webhookUrl = `${API_BASE_URL}/api/generation/video-webhook/${webhookId}?generationId=${generationId}&chatId=${chatId}&userId=${userId}&messageId=${messageId}&language=${language}&effect=${effect}`;
+  const webhookUrl = `${API_BASE_URL}/api/generation/video-webhook/${webhookId}?generationId=${generationId}&chatId=${chatId}&userId=${userId}&messageId=${messageId}&language=${language}&effect=${effect}&source=${source}`;
   
   const prediction = await replicate.predictions.create({
     version: "minimax/video-01-live",
@@ -113,7 +113,8 @@ export async function generateVideoFromImage(
   userId: string,
   messageId: number,
   language: string = 'en',
-  effect: string = 'animation'
+  effect: string = 'animation',
+  source?: string
 ): Promise<string> {
   try {
     // Determine which generation function to use based on effect type
@@ -128,7 +129,8 @@ export async function generateVideoFromImage(
         userId, 
         messageId, 
         language, 
-        effect
+        effect,
+        source
       );
     } else {
       // Default to animation/claymation/etc effects via Replicate
@@ -140,7 +142,8 @@ export async function generateVideoFromImage(
         userId, 
         messageId, 
         language, 
-        effect
+        effect,
+        source
       );
     }
   } catch (error) {
@@ -175,15 +178,39 @@ export async function getPredictionStatus(predictionId: string): Promise<{ statu
  * @param chatId Telegram chat ID to send video to
  * @param messageId Message ID of processing message
  * @param language User's preferred language
+ * @param source Optional source of the video generation
  */
 export async function processCompletedVideo(
   generationId: string,
   videoUrl: string,
   chatId: number,
   messageId: number,
-  language: string
+  language: string,
+  source?: string
 ): Promise<void> {
   try {
+    // Get user information from the generation record
+    const generation = await prisma.generation.findUnique({
+      where: { id: generationId },
+      select: { userId: true }
+    });
+    
+    if (!generation) {
+      console.error(`Generation ${generationId} not found`);
+      return;
+    }
+    
+    // Get the user information including referral code
+    const user = await prisma.user.findUnique({
+      where: { id: generation.userId },
+      select: { remainingGenerations: true, referralCode: true }
+    });
+    
+    if (!user) {
+      console.error(`User for generation ${generationId} not found`);
+      return;
+    }
+    
     // Update generation record
     await prisma.generation.update({
       where: { id: generationId },
@@ -193,14 +220,27 @@ export async function processCompletedVideo(
       }
     });
     
-    // Send all messages in a batch to ensure efficient connection usage
+    // Get completion message with watermark from translation
+    const completionMessage = language === 'ru' 
+      ? '🎬 Ваше видео готово!' 
+      : '🎬 Your video is ready!';
+    
+    // Get watermark text from translations
+    const watermarkText = language === 'ru'
+      ? `<a href='https://t.me/${process.env.BOT_USERNAME}?start=p_${user.referralCode}'>Сгенерировано в Avato Effects Bot 📸</a>\n\nСоздано при поддержке <a href='https://t.me/avato_ai'>Avato AI 📸</a>`
+      : `<a href='https://t.me/${process.env.BOT_USERNAME}?start=p_${user.referralCode}'>Created with Avato Effects Bot 📸</a>\n\nSupported by <a href='https://t.me/avato_ai'>Avato AI 📸</a>`;
+    
+    // Caption for video combining completion message and watermark
+    const videoCaption = `${completionMessage}\n\n${watermarkText}`;
+    
+    // Send status update and video via one batch
     await publishBatch([
       {
         channel: 'bot:status_update',
         message: JSON.stringify({
           chatId,
           messageId,
-          text: language === 'ru' ? '🎬 Ваше видео готово!' : '🎬 Your video is ready!',
+          text: completionMessage,
           parseMode: 'HTML'
         })
       },
@@ -209,9 +249,12 @@ export async function processCompletedVideo(
         message: JSON.stringify({
           chatId,
           videoUrl,
-          caption: language === 'ru' 
-            ? `Видео, созданное из вашего изображения.`
-            : `Video generated from your image.`
+          caption: videoCaption,
+          parseMode: 'HTML',
+          language,
+          userId: generation.userId,
+          remainingGenerations: user.remainingGenerations,
+          source: source || 'command' // Pass along the source
         })
       }
     ]);

@@ -77,7 +77,7 @@ export async function applyImageEffect(imagePath: string, effect: EffectType, re
   }
 } 
 
-export async function generateVideoWithFalEffect(imagePathOrUrl: string, prompt: string, generationId: string, chatId: number, userId: string, messageId: number, language: string = 'en', effect: string = 'hug'): Promise<string> {
+export async function generateVideoWithFalEffect(imagePathOrUrl: string, prompt: string, generationId: string, chatId: number, userId: string, messageId: number, language: string = 'en', effect: string = 'hug', source?: string): Promise<string> {
   try {
     let imageData;
     
@@ -98,7 +98,7 @@ export async function generateVideoWithFalEffect(imagePathOrUrl: string, prompt:
     const { v4: uuidv4 } = await import('uuid');
     // Create unique webhook ID for callback
     const webhookId = uuidv4();
-    const webhookUrl = `${API_BASE_URL}/api/generation/video-webhook/${webhookId}?generationId=${generationId}&chatId=${chatId}&userId=${userId}&messageId=${messageId}&language=${language}&effect=${effect}`;
+    const webhookUrl = `${API_BASE_URL}/api/generation/video-webhook/${webhookId}?generationId=${generationId}&chatId=${chatId}&userId=${userId}&messageId=${messageId}&language=${language}&effect=${effect}&source=${source}`;
     
     // Upload file to FAL storage
     const url = await fal.storage.upload(imageData);

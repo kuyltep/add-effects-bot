@@ -96,6 +96,7 @@ videoScene.on('text', async (ctx, next) => {
     await processVideoGeneration(
       ctx, 
       'animation',
+      undefined,
       processedPrompt.translatedPrompt,
       processedPrompt.originalPrompt,
       processedPrompt.isTranslated

@@ -15,6 +15,7 @@ import {
 import { Logger } from '../../utils/rollbar.logger';
 
 // STEP HANDLERS
+const initialOptionHandler = new Composer<MyContext>();
 const effectSelectorHandler = new Composer<MyContext>();
 const photoHandler = new Composer<MyContext>();
 
@@ -31,6 +32,30 @@ const effectOptions: { key: EffectType; labelKey: string }[] = [
 ];
 
 // WIZARD STEP TRANSITIONS & HANDLERS
+
+/**
+ * Displays the initial selection between photo styling and video effects
+ */
+async function showInitialOptions(ctx: MyContext): Promise<void> {
+  const stylizePhotoText = ctx.i18n.locale === 'ru' 
+    ? '🕶 Стилизовать фото'
+    : '🕶 Stylize Photo';
+    
+  const videoEffectsText = ctx.i18n.locale === 'ru'
+    ? '✨ Видео эффекты'
+    : '✨ Video Effects';
+    
+  await ctx.reply(
+    ctx.i18n.t('bot:generate.select_option'),
+    {
+      parse_mode: 'HTML',
+      reply_markup: Markup.inlineKeyboard([
+        [Markup.button.callback(stylizePhotoText, 'select_photo_styling')],
+        [Markup.button.callback(videoEffectsText, 'select_video_effects')]
+      ]).reply_markup
+    }
+  );
+}
 
 /**
  * Sends the effect selection message and keyboard.
@@ -51,7 +76,6 @@ async function showEffectSelection(ctx: MyContext): Promise<void> {
   }
   
   // Add the cancel button in its own row
-  keyboard.push([Markup.button.callback(ctx.i18n.t('bot:common.cancel'), 'cancel_generation')]);
 
   await ctx.reply(ctx.i18n.t('bot:generate.select_effect_prompt'), {
     parse_mode: 'HTML',
@@ -164,10 +188,28 @@ photoHandler.on('message', async ctx => {
   await ctx.reply(ctx.i18n.t('bot:generate.send_photo_for_effect'));
 });
 
+// Handle initial options
+initialOptionHandler.action('select_photo_styling', async (ctx) => {
+  await ctx.answerCbQuery();
+  await showEffectSelection(ctx);
+  return ctx.wizard.next(); // Move to effect selection handler step
+});
+
+initialOptionHandler.action('select_video_effects', async (ctx) => {
+  await ctx.answerCbQuery();
+  // Enter the videoEffect scene with source information
+  return ctx.scene.enter('videoEffect', { source: 'generate' });
+});
+
+initialOptionHandler.action('cancel_generation', async (ctx) => {
+  await ctx.answerCbQuery();
+  return exitScene(ctx, 'bot:generate.cancelled');
+});
+
 // SCENE DEFINITION
 export const generateScene = new Scenes.WizardScene<MyContext>(
   'generate',
-  // Step 0: Initial check and effect selection
+  // Step 0: Initial check and options selection
   async (ctx) => {
     const telegramId = ctx.from?.id.toString() || '';
     const initState = await initializeWizardState(ctx, telegramId);
@@ -180,12 +222,14 @@ export const generateScene = new Scenes.WizardScene<MyContext>(
       return ctx.scene.leave();
     }
     
-    await showEffectSelection(ctx);
-    return ctx.wizard.next(); // Move to effect selection handler step
+    await showInitialOptions(ctx);
+    return ctx.wizard.next(); // Move to initial options handler step
   },
-  // Step 1: Handle effect selection callback
+  // Step 1: Handle initial options selection
+  initialOptionHandler,
+  // Step 2: Handle effect selection callback
   effectSelectorHandler,
-  // Step 2: Handle photo input
+  // Step 3: Handle photo input
   photoHandler
 );
 

@@ -6,7 +6,8 @@ import { createRedisConnection } from '../utils/redis';
 export interface VideoGenerationJob {
   userId: string;
   generationId: string;
-  imagePath: string;
+  imagePath?: string;
+  fileId?: string;
   prompt: string;
   translatedPrompt: string | null;
   isTranslated: boolean;
@@ -14,6 +15,7 @@ export interface VideoGenerationJob {
   messageId: number;
   language: string;
   effect: string;
+  source?: string; // Track where the video generation was initiated from
 }
 
 const redisConnection = createRedisConnection();

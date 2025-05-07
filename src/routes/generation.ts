@@ -9,13 +9,14 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
     async (request, reply) => {
       try {
         const { webhookId } = request.params as { webhookId: string };
-        const { generationId, chatId, userId, messageId, language, effect } = request.query as {
+        const { generationId, chatId, userId, messageId, language, effect, source } = request.query as {
           generationId: string;
           chatId: string;
           userId: string;
           messageId: string;
           language: string;
           effect: string;
+          source: string;
         };
         
         // Validate required parameters
@@ -57,7 +58,8 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
             videoUrl,
             parseInt(chatId, 10),
             parseInt(messageId, 10),
-            language || 'en'
+            language || 'en',
+            source
           );
           return reply.send({ success: true });
         }

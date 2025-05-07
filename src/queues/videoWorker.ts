@@ -7,6 +7,7 @@ import fs from 'fs';
 import {  generateVideoFromImage } from '../services/replicate';
 import i18next from '../i18n';
 import { isMainThread, parentPort, workerData } from 'worker_threads';
+import path from 'path';
 
 // Initialize resources
 const redisConnection = createRedisConnection();
@@ -47,28 +48,73 @@ async function processVideoJob(job: Job<VideoGenerationJob>): Promise<VideoResul
       userId, 
       generationId, 
       imagePath, 
+      fileId,
       prompt, 
       translatedPrompt, 
       isTranslated,
       chatId,
       messageId,
       language,
-      effect
+      effect,
+      source
     } = jobData;
     
+    // Determine the image path - if fileId is provided, we need to download it first
+    let finalImagePath = imagePath;
+    
+    if (fileId) {
+      try {
+        // Download the file from Telegram
+        await sendStatusUpdate(jobData, 'downloading');
+        
+        // Create a temporary path for the downloaded file
+        const tempDir = path.join(process.env.UPLOAD_DIR || 'uploads', userId);
+        await fs.promises.mkdir(tempDir, { recursive: true });
+        const downloadPath = path.join(tempDir, `${generationId}.jpg`);
+        
+        // Request the bot to download the file
+        await redisPublisher.publish('bot:download_file', JSON.stringify({
+          fileId,
+          downloadPath
+        }));
+        
+        // Wait for file to be downloaded (simple polling with timeout)
+        const maxWait = 30000; // 30 seconds
+        const interval = 1000; // 1 second
+        let waited = 0;
+        
+        while (waited < maxWait) {
+          await new Promise(resolve => setTimeout(resolve, interval));
+          waited += interval;
+          
+          if (fs.existsSync(downloadPath) && fs.statSync(downloadPath).size > 0) {
+            finalImagePath = downloadPath;
+            break;
+          }
+        }
+        
+        if (!finalImagePath) {
+          throw new Error('Failed to download file from Telegram');
+        }
+      } catch (downloadError) {
+        console.error('Error downloading file from Telegram:', downloadError);
+        throw new Error(`Failed to download image: ${downloadError.message}`);
+      }
+    }
+    
     // Validate data
-    if (!imagePath.startsWith('http') && !fs.existsSync(imagePath)) {
+    if (!finalImagePath || (!finalImagePath.startsWith('http') && !fs.existsSync(finalImagePath))) {
       throw new Error('Image file not found');
     }
 
     // Update the user that processing has started
-    await sendStatusUpdate(jobData, 'enhancing');
+    await sendStatusUpdate(jobData, 'processing');
     
     try {
       // Determine if we need to enhance the image based on effect type
       // FAL AI effects don't need enhancement - they work directly with the image
       
-      let processedImagePath = imagePath;
+      let processedImagePath = finalImagePath;
       
       // Only enhance image for non-FAL effects
 
@@ -82,7 +128,8 @@ async function processVideoJob(job: Job<VideoGenerationJob>): Promise<VideoResul
         userId,
         messageId,
         language,
-        effect
+        effect,
+        source
       );
 
       // Deduct generations from user's balance
