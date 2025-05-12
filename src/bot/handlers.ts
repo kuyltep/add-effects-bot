@@ -84,11 +84,9 @@ export function setupSettingsCommand() {
 }
 
 export function setupCheckSubscriptionCommand() {
-  // Add callback handler for subscription check button
-  bot.action('check_subscription', async (ctx) => {
-    await ctx.answerCbQuery();
-    await checkChannelSubscriptionLogic(ctx, true);
-  });
+  // This handler is redundant because the check_subscription action
+  // is already being handled in the check-subscription.ts middleware
+  // Removing to avoid dual handling of the same action
 }
 
 // Команда /help - помощь
@@ -375,5 +373,4 @@ export function setupAllHandlers() {
   setupVideoCallbacks();
   setupUpgradeCommand();
   setupUpgradeCallbacks();
-  setupCheckSubscriptionCommand();
 }

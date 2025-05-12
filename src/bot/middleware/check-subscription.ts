@@ -15,24 +15,34 @@ export async function checkChannelSubscriptionLogic(
   // Get required channels from env
   const requiredChannels = (process.env.REQUIRED_CHANNELS || '').split(',').filter(Boolean);
   if (!requiredChannels.length) return true; // No channels configured
+  
   try {
     // Find the user record
     const user = await prisma.user.findUnique({ where: { telegramId: userId.toString() } });
     if (!user) return true; // Cannot check for non-existent user in DB
 
     // Check subscription status via Telegram API
-    const subscriptionPromises = requiredChannels.map(async channelId => {
+    const subscriptionResults = [];
+    
+    for (const channelId of requiredChannels) {
       try {
-        const member = await ctx.telegram.getChatMember(channelId, userId);
-        return ['creator', 'administrator', 'member'].includes(member.status);
+        // Format channel ID correctly for API call
+        // For usernames: ensure they start with @
+        // For numeric IDs: use as-is
+        const normalizedChannelId = channelId.startsWith('@') ? channelId : 
+                                   /^-?\d+$/.test(channelId) ? channelId : `@${channelId}`;
+        
+        const member = await ctx.telegram.getChatMember(normalizedChannelId, userId);
+        const isSubscribed = ['creator', 'administrator', 'member'].includes(member.status);
+        subscriptionResults.push({ channelId: normalizedChannelId, isSubscribed });
       } catch (error) {
-        // Silently handle errors
-        return false; // Treat API errors or specific cases as not subscribed for that channel
+        // If we can't check subscription status, assume not subscribed
+        subscriptionResults.push({ channelId, isSubscribed: false });
       }
-    });
-
-    const subscriptionStatuses = await Promise.all(subscriptionPromises);
-    const isSubscribedToAll = subscriptionStatuses.every(status => status);
+    }
+    
+    // Determine if user is subscribed to all channels
+    const isSubscribedToAll = subscriptionResults.every(result => result.isSubscribed);
 
     // Logic for granting free generations and updating DB
     if (isSubscribedToAll) {
@@ -79,8 +89,9 @@ export async function checkChannelSubscriptionLogic(
         });
       }
 
-      // Create channel buttons
+      // Create channel buttons with proper formatting for display
       const channelButtons = requiredChannels.map(channelId => {
+        // Extract username for the button display and URL
         const username = channelId.startsWith('@') ? channelId.substring(1) : channelId;
         return [Markup.button.url(username, `https://t.me/${username}`)];
       });
@@ -94,10 +105,8 @@ export async function checkChannelSubscriptionLogic(
       try {
         // If triggered by button, edit the existing message
         if (isCallbackCheck && ctx.callbackQuery?.message) {
-          await ctx.editMessageText(
-            ctx.i18n.t('bot:subscription.not_subscribed'),
-            Markup.inlineKeyboard(keyboard)
-          );
+          
+          // Always answer the callback query to provide feedback
           await ctx.answerCbQuery(ctx.i18n.t('bot:subscription.check_again_short'));
         } else if (!isCallbackCheck) {
           // Otherwise, send a new message
@@ -107,11 +116,13 @@ export async function checkChannelSubscriptionLogic(
           );
         }
       } catch (error) {
+        console.error('Error sending subscription message:', error);
         return true; // Allow functionality even if prompt fails
       }
       return false; // User needs to subscribe
     }
   } catch (error) {
+    console.error('Unexpected error in subscription check:', error);
     return true; // Allow functionality on unexpected errors
   }
 }
@@ -127,10 +138,24 @@ export async function checkChannelSubscription(ctx: MyContext, next: () => Promi
     return next();
   }
 
-  // Skip check for the specific callback query used to re-check
+  // Handle the check_subscription callback query specifically
   if (ctx.callbackQuery && 'data' in ctx.callbackQuery && ctx.callbackQuery.data === 'check_subscription') {
-     // Handle the check logic directly here or call a specific handler
-     await checkChannelSubscriptionLogic(ctx, true); // Pass true for isCallbackCheck
+     try {
+       // First answer the callback query to prevent the spinner
+       await ctx.answerCbQuery(undefined, { cache_time: 0 });
+       
+       // Then check the subscription status with isCallbackCheck=true
+       await checkChannelSubscriptionLogic(ctx, true);
+     } catch (error) {
+       console.error('Error handling check_subscription callback:', error);
+       
+       // Try to give feedback to the user
+       try {
+         await ctx.answerCbQuery(ctx.i18n.t('bot:subscription.error_checking') || 'Error checking subscription status');
+       } catch (answerError) {
+         console.error('Failed to answer callback query:', answerError);
+       }
+     }
      return; // Don't call next() because we handled the action
   }
 
@@ -144,9 +169,8 @@ export async function checkChannelSubscription(ctx: MyContext, next: () => Promi
     // If subscribed, continue to the next middleware/handler
     return next();
   } catch (error) {
+    console.error('Error in subscription check middleware:', error);
     // Allow functionality even if the check fails unexpectedly
     return next();
   }
 }
-
-

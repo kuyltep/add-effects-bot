@@ -49,6 +49,7 @@ const stage = new Scenes.Stage<MyContext>(scenes as any);
 
 // Add the main keyboard middleware at the stage level
 // This ensures it will intercept all scene messages without causing infinite loops
+
 stage.use(createMainKeyboardMiddleware());
 
 // Устанавливаем middleware
@@ -63,13 +64,14 @@ bot.use(session({
 }));
 bot.use(i18nMiddleware()); // Use our custom i18n middleware
 bot.use(checkBannedUser); // Add banned user check middleware
+bot.use(checkChannelSubscription);
+
 bot.use(stage.middleware());
 bot.use((ctx, next) => {
   // Добавляем объект prisma в контекст
   ctx.prisma = prisma;
   return next();
 });
-bot.use(checkChannelSubscription);
 
 // Add global error handler to prevent bot crashes
 bot.catch((err, ctx) => {
@@ -226,10 +228,10 @@ async function sendVideoToUser(data) {
     // Send the video with caption
     if (videoUrl.startsWith('http')) {
       // If URL, send directly
-      await bot.telegram.sendVideo(chatId, videoUrl, {
-        caption: caption,
+    await bot.telegram.sendVideo(chatId, videoUrl, {
+      caption: caption,
         parse_mode: parseMode
-      });
+    });
     } else if (fs.existsSync(videoUrl)) {
       // If local file, send from disk
       await bot.telegram.sendVideo(chatId, { source: videoUrl }, {
