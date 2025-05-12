@@ -142,7 +142,7 @@ export async function queueImageGenerationJob(data: Omit<ImageEffectJobData, 'ge
 export async function canUserGenerate(ctx: MyContext, userData: Pick<User, 'id' | 'remainingGenerations' | 'subscriptionActive' | 'referralCode'>): Promise<boolean> {
   // Check if the user has remaining generations
   if (userData.remainingGenerations <= 0 && !userData.subscriptionActive) {
-    await ctx.reply(ctx.i18n.t('bot:generate.no_generations_left', {link: `https://t.me/${process.env.BOT_USERNAME}?start=${userData.referralCode}`}), Markup.inlineKeyboard([Markup.button.callback(ctx.i18n.t('bot:generate.buy_generations'), 'buy_generations')]));
+    await ctx.reply(ctx.i18n.t('bot:generate.no_generations_left', {link: `https://t.me/${process.env.BOT_USERNAME}?start=${userData.referralCode}`}), Markup.inlineKeyboard([Markup.button.callback(ctx.i18n.t('bot:buttons.buy_generations'), 'buy_generations')]));
     return false;
   }
   
