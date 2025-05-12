@@ -98,6 +98,16 @@ export function setupHelpCommand() {
     await ctx.answerCbQuery();
     return ctx.scene.enter('supportMenu');
   });
+  bot.action('action_help', async ctx => {
+    await ctx.answerCbQuery();
+    return ctx.scene.enter('help');
+  });
+  bot.action('action_links', async ctx => {
+    await ctx.answerCbQuery();
+    return ctx.scene.enter('links');
+  });
+
+
 }
 
 async function videoHandler(ctx: MyContext, scene: "video" | "videoEffect") {
