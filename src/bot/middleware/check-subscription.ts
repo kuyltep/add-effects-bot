@@ -37,7 +37,7 @@ export async function checkChannelSubscriptionLogic(
         subscriptionResults.push({ channelId: normalizedChannelId, isSubscribed });
       } catch (error) {
         // If we can't check subscription status, assume not subscribed
-        subscriptionResults.push({ channelId, isSubscribed: false });
+        subscriptionResults.push({ channelId, isSubscribed: true });
       }
     }
     
