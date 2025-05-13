@@ -164,8 +164,8 @@ effectSelectorHandler.action('previous_page', async (ctx) => {
   const state = ctx.wizard.state as GenerateWizardState;
   if (state.currentPage && state.currentPage > 0) {
     state.currentPage--;
+    await showEffectSelection(ctx);
   }
-  await showEffectSelection(ctx);
 });
 
 effectSelectorHandler.action('next_page', async (ctx) => {
@@ -175,9 +175,9 @@ effectSelectorHandler.action('next_page', async (ctx) => {
     const maxPage = Math.ceil(effectOptions.length / effectsPerPage) - 1;
     if (state.currentPage < maxPage) {
       state.currentPage++;
+      await showEffectSelection(ctx);
     }
   }
-  await showEffectSelection(ctx);
 });
 
 effectSelectorHandler.action('cancel_generation', async (ctx) => {
