@@ -51,6 +51,8 @@ export interface GenerateWizardState {
   userData: WizardUserData;
   /** User settings */
   userSettings: UserSettings;
+  /** Current page for pagination */
+  currentPage?: number;
 }
 
 /**
@@ -97,7 +99,23 @@ export interface SettingsWizardState {
 }
 
 // Define the possible effect types
-export type EffectType = 'claymation' | 'ghibli' | 'pixar' | 'plushify' | 'ghiblify' | 'cartoonify';
+export type EffectType =
+  // OpenAI
+  | 'claymation'
+  | 'ghibli'
+  | 'pixar'
+  | 'bratz'       // new
+  | 'cat'         // new
+  | 'dog'         // new
+  | 'sticker'     // new
+  | 'new_disney'  // new
+  | 'old_disney'  // new
+  | 'mitchells'   // new
+  | 'dreamworks'  // new
+  // FAL AI
+  | 'plushify'
+  | 'ghiblify'
+  | 'cartoonify';
 
 /**
  * Data specific to the generation process

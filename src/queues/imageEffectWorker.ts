@@ -18,7 +18,7 @@ const UPLOAD_DIR = config.server.uploadDir;
 const SUPPORT_USERNAME = process.env.TELEGRAM_SUPPORT_USERNAME || 'support';
 
 // Group effects by processing service
-const OPENAI_EFFECTS = ['claymation', 'ghibli', 'pixar'];
+const OPENAI_EFFECTS = ['claymation', 'ghibli', 'pixar', 'bratz', 'cat', 'dog', 'sticker', 'new_disney', 'old_disney', 'mitchells', 'dreamworks'];
 const FAL_AI_EFFECTS = ['plushify', 'ghiblify', 'cartoonify'];
 
 // Initialize resources

@@ -14,7 +14,15 @@ const BASE_PROMPT_TEMPLATE = "Take this (these) generative person(s) and create 
 const STYLE_DEFINITIONS = {
   "pixar": "pixar studio 3d animation",
   "ghibli": "ghibli studio anime",
-  "claymation": "claymation cartoon"
+  "claymation": "Aardman cartoon style",
+  "bratz": "BRATZ style action doll made of soft-touch plastic. The doll should stand in a brown box, in a recess. There should be accessories in the recesses near the doll",
+  "cat": "photorealistic animal(s) - cat(s)",
+  "dog": "photorealistic animal(s) - dog(s)",
+  "sticker": "sticker style",
+  "new_disney": "disney style",
+  "old_disney": "old disney cartoon style",
+  "mitchells": "in The Mitchells vs. the Machines style",
+  "dreamworks": "DreamWorks cartoon style"
 };
 
 // Generate full prompts from the template
