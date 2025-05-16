@@ -41,7 +41,6 @@ export async function processReferralCode(
       },
     });
 
-    // Add 5 generations to both users
     await prisma.user.update({
       where: { id: referrer.id },
       data: { remainingGenerations: { increment: parseInt(process.env.DEFAULT_GENERATIONS || '3', 10) } },

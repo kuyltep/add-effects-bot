@@ -9,7 +9,8 @@ export interface ImageEffectJobData {
   generationId: string;
   userId: string;
   fileId: string;
-  effect: EffectType;
+  effect?: EffectType;
+  logoEffect?: string;
   chatId: string;
   messageId: number;
   language: string;

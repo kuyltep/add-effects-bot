@@ -94,7 +94,7 @@ videoEffectScene.enter(async (ctx) => {
  * Display effect selection when we don't have an image yet
  */
 async function showEffectSelectionNoImage(ctx: MyContext) {
-  const state = ctx.scene.state as VideoSceneState;
+    const state = ctx.scene.state as VideoSceneState;
   const effectOptions = getEffects(state.source || "command");
   
   // Create effect selection buttons - 2 per row
@@ -165,21 +165,21 @@ async function showEffectSelection(ctx: MyContext, imagePath: string) {
   // Add back button in its own row
   effectButtons.push([Markup.button.callback(ctx.i18n.t('bot:video.back_button'), 'back')]);
 
-  // Show image and prompt for effect selection
-  const sentMessage = await ctx.replyWithPhoto(
-    imagePath.startsWith('http') ? imagePath : { source: imagePath },
-    {
-      caption: ctx.i18n.t('bot:effects.select_effect', { 
-        cost: VIDEO_GENERATION_COST
+    // Show image and prompt for effect selection
+    const sentMessage = await ctx.replyWithPhoto(
+      imagePath.startsWith('http') ? imagePath : { source: imagePath },
+      {
+        caption: ctx.i18n.t('bot:effects.select_effect', { 
+          cost: VIDEO_GENERATION_COST
       }) + '\n\n' + ctx.i18n.t('bot:effects.paired_note'),
-      parse_mode: 'HTML',
-      ...Markup.inlineKeyboard(effectButtons)
-    }
-  );
-  
-  // Store message ID for later deletion if needed
-  state.messageId = sentMessage.message_id;
-}
+        parse_mode: 'HTML',
+        ...Markup.inlineKeyboard(effectButtons)
+      }
+    );
+    
+    // Store message ID for later deletion if needed
+    state.messageId = sentMessage.message_id;
+  }
 
 // Handle all effect type selections
 videoEffectScene.action(/^effect:(.+)$/, async (ctx) => {
@@ -332,4 +332,4 @@ videoEffectScene.action('back', async (ctx) => {
   }
   
   return await exitScene(ctx);
-}); 
+});
