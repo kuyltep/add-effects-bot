@@ -110,7 +110,7 @@ async function downloadTelegramFile(fileId: string): Promise<string> {
  * Processes an image effect generation job.
  */
 async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void> {
-    const { generationId, userId, fileId, effect, chatId, messageId, language, resolution = 'SQUARE' } = job.data;
+    const { generationId, userId, fileId, effect, chatId, messageId, language, resolution = 'SQUARE', logoEffect } = job.data;
 
     let localFilePath: string | null = null;
     let finalOutputPath: string | null = null;
@@ -138,17 +138,18 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
         await redisPublisher.publish('bot:status_update', JSON.stringify({ 
             chatId, 
             messageId, 
-            text: getMessage('applying_effect', language, { effect }) 
+            text: getMessage('applying_effect', language, { effect: effect || logoEffect }) 
         }));
         
         if (FAL_AI_EFFECTS.includes(effect)) {
             // Process with FAL AI
             finalOutputPath = await applyImageEffect(localFilePath, effect, resolution as Resolution);
         } else if (OPENAI_EFFECTS.includes(effect)) {
-
-            
             // Pass the resolution to OpenAI service
-            finalOutputPath = await editImageOpenAI(localFilePath, effect, resolution as Resolution);
+            finalOutputPath = await editImageOpenAI(localFilePath, effect, resolution as Resolution, job.data.logoEffect);
+        } else if (job.data.logoEffect) {
+            // Process logo effects
+            finalOutputPath = await editImageOpenAI(localFilePath, null, resolution as Resolution, job.data.logoEffect);
         } else {
             throw new Error(`Unsupported effect type: ${effect}`);
         }
