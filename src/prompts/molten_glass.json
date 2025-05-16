@@ -1,0 +1,45 @@
+{
+  "styleAesthetic": {
+  "overallVibe": "Futuristic molten-glass techno-glow",
+  "colorPalette": {
+  "background": "Deep black",
+  "accents": [
+  "Molten orange",
+  "Amber highlights",
+  "Hints of subtle blue edge refractions"
+  ]
+  },
+  "materialsAndTextures": [
+  {
+  "type": "Translucent glass-like material",
+  "description": "Smooth, thick, and slightly distorted surface resembling molten glass or resin, glowing from within"
+  },
+  {
+  "type": "Emissive glow",
+  "description": "Intense, fiery inner glow that radiates through the transparent form, creating soft illumination and hot edges"
+  },
+  {
+  "type": "Speckled surface",
+  "description": "Tiny light-reflective imperfections scattered across the glass for depth and realism"
+  }
+  ],
+  "lightingAndShadows": {
+  "description": "High-contrast lighting with internal illumination; external lighting is minimal to highlight the glow",
+  "effect": "Emphasizes edges and contours with radiant highlights while allowing dark areas to fade into the black background"
+  },
+  "moodKeywords": [
+  "Molten",
+  "Energetic",
+  "Techno-futuristic",
+  "Luminous",
+  "Digital-sculptural"
+  ],
+  "keyAttributes": [
+  "Glowing translucent material",
+  "Dark minimal background",
+  "Curved, smooth 3D form",
+  "High-emphasis on light play and internal glow",
+  "Visually dynamic edges"
+  ]
+  }
+  }
