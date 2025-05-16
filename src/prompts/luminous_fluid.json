@@ -1,0 +1,42 @@
+{
+  "styleAesthetic": {
+  "overallVibe": "Minimalist futuristic elegance with iridescent fluidity",
+  "colorPalette": {
+  "background": "Pure black",
+  "accents": [
+  "Prismatic reflections",
+  "Hints of cyan, magenta, yellow, orange, and blue",
+  "Transparent and glass-like highlights"
+  ]
+  },
+  "materialsAndTextures": [
+  {
+  "type": "High-gloss transparent material",
+  "description": "Smooth, seamless, and fluid glass or liquid resin with a mirror-like surface"
+  },
+  {
+  "type": "Iridescent finish",
+  "description": "Light-bending surface that displays shifting rainbow-like colors"
+  }
+  ],
+  "lightingAndShadows": {
+  "description": "High-contrast lighting emphasizing contour edges and internal reflections",
+  "effect": "Creates ethereal glows and highlights along smooth curves while deep shadows preserve minimalism"
+  },
+  "moodKeywords": [
+  "Fluid",
+  "Ethereal",
+  "Futuristic",
+  "Elegant",
+  "Sleek",
+  "Digital luxury"
+  ],
+  "keyAttributes": [
+  "Wavy, smooth 3D forms",
+  "Minimal background for maximum shape focus",
+  "Refractive light play and spectral highlights",
+  "Organic-meets-digital abstraction",
+  "Sharp yet graceful transitions between color and transparency"
+  ]
+  }
+  }

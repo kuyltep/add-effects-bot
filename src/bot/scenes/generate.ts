@@ -17,6 +17,7 @@ import { Logger } from '../../utils/rollbar.logger';
 // STEP HANDLERS
 const initialOptionHandler = new Composer<MyContext>();
 const effectSelectorHandler = new Composer<MyContext>();
+const logoEffectSelectorHandler = new Composer<MyContext>();
 const photoHandler = new Composer<MyContext>();
 
 const effectsPerPage = 8;
@@ -41,19 +42,24 @@ const effectOptions: { key: EffectType; labelKey: string }[] = [
   { key: 'cartoonify', labelKey: 'bot:generate.effect_cartoonify' },
 ];
 
+// Logo effect options
+const logoEffectOptions = [
+  'logo_in_the_haze',
+  'luminous_fluid',
+  'molten_glass',
+  'on_wood',
+  'organic'
+];
+
 // WIZARD STEP TRANSITIONS & HANDLERS
 
 /**
  * Displays the initial selection between photo styling and video effects
  */
 async function showInitialOptions(ctx: MyContext): Promise<void> {
-  const stylizePhotoText = ctx.i18n.locale === 'ru' 
-    ? '🕶 Стилизовать фото'
-    : '🕶 Stylize Photo';
-    
-  const videoEffectsText = ctx.i18n.locale === 'ru'
-    ? '✨ Видео эффекты'
-    : '✨ Video Effects';
+  const stylizePhotoText = ctx.i18n.t('bot:generate.effect_photo');
+  const videoEffectsText = ctx.i18n.t('bot:generate.effect_video');
+  const stylizeLogoText = ctx.i18n.t('bot:generate.stylize_logo');
     
   await ctx.reply(
     ctx.i18n.t('bot:generate.select_option'),
@@ -61,7 +67,8 @@ async function showInitialOptions(ctx: MyContext): Promise<void> {
       parse_mode: 'HTML',
       reply_markup: Markup.inlineKeyboard([
         [Markup.button.callback(stylizePhotoText, 'select_photo_styling')],
-        [Markup.button.callback(videoEffectsText, 'select_video_effects')]
+        [Markup.button.callback(videoEffectsText, 'select_video_effects')],
+        [Markup.button.callback(stylizeLogoText, 'select_logo_styling')]
       ]).reply_markup
     }
   );
@@ -128,6 +135,57 @@ async function showEffectSelection(ctx: MyContext): Promise<void> {
 }
 
 /**
+ * Sends the logo effect selection message and keyboard.
+ */
+async function showLogoEffectSelection(ctx: MyContext): Promise<void> {
+  // Create localized button labels
+  const effectLabels = {
+    logo_in_the_haze: ctx.i18n.t('bot:generate.logo_effect_logo_in_the_haze'),
+    luminous_fluid: ctx.i18n.t('bot:generate.logo_effect_luminous_fluid'),
+    molten_glass: ctx.i18n.t('bot:generate.logo_effect_molten_glass'),
+    on_wood: ctx.i18n.t('bot:generate.logo_effect_on_wood'),
+    organic: ctx.i18n.t('bot:generate.logo_effect_organic')
+  };
+
+  // Create buttons for each logo effect
+  const effectButtons = logoEffectOptions.map(effect => 
+    Markup.button.callback(effectLabels[effect], `select_logo_effect_${effect}`)
+  );
+  
+  // Arrange buttons in two columns
+  const keyboardRows = [];
+  for (let i = 0; i < effectButtons.length; i += 1) {
+    const row = [effectButtons[i]];
+    keyboardRows.push(row);
+  }
+
+  
+  const messageText = ctx.i18n.t('bot:generate.select_logo_style_prompt');
+    
+  const replyMarkup = Markup.inlineKeyboard(keyboardRows).reply_markup;
+
+  try {
+    if (ctx.callbackQuery?.message) {
+      await ctx.editMessageText(messageText, {
+        parse_mode: 'HTML',
+        reply_markup: replyMarkup,
+      });
+    } else {
+      await ctx.reply(messageText, {
+        parse_mode: 'HTML',
+        reply_markup: replyMarkup,
+      });
+    }
+  } catch (error) {
+    Logger.warn('Failed to edit or send logo effect selection message, sending new one.', { error });
+    await ctx.reply(messageText, {
+      parse_mode: 'HTML',
+      reply_markup: replyMarkup,
+    });
+  }
+}
+
+/**
  * Handles the selection of an effect.
  */
 effectSelectorHandler.action(/select_effect_(claymation|ghibli|pixar|bratz|cat|dog|sticker|new_disney|old_disney|mitchells|dreamworks|plushify|ghiblify|cartoonify)/, async (ctx) => {
@@ -159,6 +217,38 @@ effectSelectorHandler.action(/select_effect_(claymation|ghibli|pixar|bratz|cat|d
   return ctx.wizard.next();
 });
 
+/**
+ * Handles the selection of a logo effect.
+ */
+logoEffectSelectorHandler.action(/select_logo_effect_(logo_in_the_haze|luminous_fluid|molten_glass|on_wood|organic)/, async (ctx) => {
+  await ctx.answerCbQuery();
+  const state = ctx.wizard.state as GenerateWizardState;
+  const selectedLogoEffect = ctx.match[1];
+
+  if (!state?.generationData) {
+    Logger.warn('State missing in logo effect selection', { userId: ctx.from?.id });
+    return exitWithError(ctx, 'bot:errors.general');
+  }
+
+  // Store the selected logo effect
+  state.generationData.logoEffect = selectedLogoEffect;
+
+  // Prompt for photo
+  try {
+    await ctx.editMessageText(ctx.i18n.t('bot:generate.send_logo_for_effect'), {
+      parse_mode: 'HTML',
+    });
+  } catch (error) {
+    // If editing fails, send a new message
+    await ctx.reply(ctx.i18n.t('bot:generate.send_logo_for_effect'), {
+      parse_mode: 'HTML',
+    });
+  }
+
+  // Move to the photo handler step
+  return ctx.wizard.selectStep(4);
+});
+
 effectSelectorHandler.action('previous_page', async (ctx) => {
   await ctx.answerCbQuery();
   const state = ctx.wizard.state as GenerateWizardState;
@@ -180,22 +270,18 @@ effectSelectorHandler.action('next_page', async (ctx) => {
   }
 });
 
-effectSelectorHandler.action('cancel_generation', async (ctx) => {
-  await ctx.answerCbQuery();
-  return exitScene(ctx, 'bot:generate.cancelled');
-});
 
 /**
  * Handles photo/document input from the user.
  */
 async function handlePhotoInput(ctx: MyContext, fileId: string): Promise<void> {
   const state = ctx.wizard.state as GenerateWizardState;
-  if (!state?.generationData?.effect || !state?.userData?.id || !state?.userSettings?.resolution) {
+  if (!state?.generationData || !state?.userData?.id || !state?.userSettings?.resolution) {
     Logger.warn('State missing in photo handler', { userId: ctx.from?.id });
     return exitWithError(ctx, 'bot:errors.general');
   }
 
-  const { effect } = state.generationData;
+  const { effect, logoEffect } = state.generationData;
   const { id: userId, language } = state.userData;
   const { resolution } = state.userSettings;
 
@@ -208,6 +294,7 @@ async function handlePhotoInput(ctx: MyContext, fileId: string): Promise<void> {
       generationId: '', // Will be generated in the service
       fileId: fileId, // Pass file ID from Telegram
       effect,
+      logoEffect, // Pass the logo effect if it exists
       chatId: ctx.chat?.id.toString() || '',
       messageId: statusMessage.message_id,
       language: language || ctx.i18n.locale || 'en',
@@ -266,6 +353,12 @@ initialOptionHandler.action('select_video_effects', async (ctx) => {
   return ctx.scene.enter('videoEffect', { source: 'generate' });
 });
 
+initialOptionHandler.action('select_logo_styling', async (ctx) => {
+  await ctx.answerCbQuery();
+  await showLogoEffectSelection(ctx);
+  return ctx.wizard.selectStep(2); // Move to logo effect selection handler step
+});
+
 initialOptionHandler.action('cancel_generation', async (ctx) => {
   await ctx.answerCbQuery();
   return exitScene(ctx, 'bot:generate.cancelled');
@@ -292,9 +385,11 @@ export const generateScene = new Scenes.WizardScene<MyContext>(
   },
   // Step 1: Handle initial options selection
   initialOptionHandler,
-  // Step 2: Handle effect selection callback
+  // Step 2: Handle logo effect selection callback
+  logoEffectSelectorHandler,
+  // Step 3: Handle effect selection callback
   effectSelectorHandler,
-  // Step 3: Handle photo input
+  // Step 4: Handle photo input
   photoHandler
 );
 

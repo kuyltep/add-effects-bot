@@ -86,7 +86,17 @@
       "processing_queued": "⏳ Your request is queued! I'll send the result soon.",
       "queue_error": "⚠️ Oops! Something went wrong while queuing your request. Please try again.",
       "not_an_image": "🖼️ Please send an image file (photo or document).",
-      "cancelled": "✅ Generation cancelled."
+      "cancelled": "✅ Generation cancelled.",
+      "stylize_logo": "🔄 Stylize Logo",
+      "select_logo_style_prompt": "🎨 Select a style for your logo:",
+      "logo_effect_logo_in_the_haze": "🌫️ Logo in Haze",
+      "logo_effect_luminous_fluid": "✨ Luminous Fluid",
+      "logo_effect_molten_glass": "🔥 Molten Glass",
+      "logo_effect_on_wood": "🪵 On Wood",
+      "logo_effect_organic": "🌱 Organic Style",
+      "send_logo_for_effect": "📸 Great! Now, please send me the logo you want to stylize.",
+      "effect_photo": "🕶 Stylize Photo",
+      "effect_video": "✨ Video Effects"
     },
     "video": {
       "user_not_found": "User not found. Please start the bot again with /start.",

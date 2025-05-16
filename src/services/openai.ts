@@ -31,58 +31,73 @@ const prompts = Object.entries(STYLE_DEFINITIONS).reduce((result, [effect, style
   return result;
 }, {});
 
-export async function editImageOpenAI(imagePath: string, effect: string, resolution: Resolution = 'SQUARE'): Promise<string> {
-  try {
-    // Validate effect type
-    if (!prompts[effect]) {
-      Logger.warn(`Unknown effect type: ${effect}, using default prompt`);
-    }
+// Logo styling prompt template
+const LOGO_PROMPT_TEMPLATE = "Create a stylized logo with the following style properties: {styleProperties}. The input image should be used as the logo basis. Make sure the result maintains recognizability while applying the style.";
 
+export async function editImageOpenAI(imagePath: string, effect: string, resolution: Resolution = 'SQUARE', logoEffect?: string): Promise<string> {
+  try {
     // Check if file exists
     if (!fs.existsSync(imagePath)) {
       throw new Error(`Image file not found at path: ${imagePath}`);
     }
     
-    // Create a proper PNG version of the input image with 1024x1024 dimensions for OpenAI API
+    // Create a proper PNG version of the input image for OpenAI API
     const pngPath = await convertToPng(imagePath);
     
+    // If this is a logo effect, use the logo styling prompt
+    if (logoEffect) {
+      return await editLogoWithEffect(pngPath, logoEffect, resolution);
+    }
 
+    // Validate regular effect type
+    if (!effect) {
+      throw new Error('No effect specified and no logo effect provided');
+    }
 
+    if (!prompts[effect]) {
+      Logger.warn(`Unknown effect type: ${effect}, using default prompt`);
+    }
+
+    // Process with standard effects
     return await editImageWithQuality(pngPath, prompts[effect] || "Create a cute stylized hero image", 'medium', resolution);
-    // Process with OpenAI
-    // const rsp = await client.images.edit({
-    //   model: process.env.OPENAI_IMAGE_MODEL,
-    //   image: image,
-    //   n: 1,
-      
-    //   prompt: prompts[effect] || "Create a cute stylized hero image",
-    // });
-
-    // // Prepare output path in the same directory as the input
-    // const outputDir = path.dirname(imagePath);
-    // const outputPath = path.join(process.cwd(), outputDir, "processed_image.jpg");
-
-    // // Save the image to the output path
-    // if (rsp.data[0].b64_json) {
-    //   const image_base64 = rsp.data[0].b64_json;
-    //   const image_bytes = Buffer.from(image_base64, "base64");
-    //   fs.writeFileSync(outputPath, image_bytes);
-      
-    //   // Resize the output image to the requested resolution
-    //   const resultPath = path.join(process.cwd(), outputDir, "effect_image.jpg");
-    //   await resizeImage(outputPath, resolution, resultPath);
-      
-    //   return resultPath;
-    // } else if (rsp.data[0].url) {
-    //   // If we get a URL instead of base64, handle that case
-    //   return outputPath;
-    // }
-
   } catch (error) {
     Logger.error(`Error in OpenAI image editing: ${error.message}`, {
       effect,
       imagePath,
       resolution,
+      logoEffect,
+    });
+    throw error;
+  }
+}
+
+/**
+ * Processes logo with the specified effect style
+ */
+export async function editLogoWithEffect(imagePath: string, logoEffect: string, resolution: Resolution = 'SQUARE'): Promise<string> {
+  try {
+    // Load the effect JSON file
+    const effectFilePath = path.join(process.cwd(), 'src', 'prompts', `${logoEffect}.json`);
+    
+    if (!fs.existsSync(effectFilePath)) {
+      throw new Error(`Logo effect file not found: ${effectFilePath}`);
+    }
+    
+    // Read and parse the effect JSON
+    const effectData = JSON.parse(fs.readFileSync(effectFilePath, 'utf8'));
+    
+    // Convert the effect properties into a string for the prompt
+    
+    
+    // Create the prompt with the style properties
+    const prompt = LOGO_PROMPT_TEMPLATE.replace('{styleProperties}', JSON.stringify(effectData));
+    
+    // Process with OpenAI using high quality for logos
+    return await editImageWithQuality(imagePath, prompt, 'medium', resolution);
+  } catch (error) {
+    Logger.error(`Error in logo effect processing: ${error.message}`, {
+      logoEffect,
+      imagePath,
     });
     throw error;
   }

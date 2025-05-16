@@ -128,4 +128,5 @@ export interface GenerationData {
   fileId?: string;
   hasPhoto?: boolean;
   effect?: EffectType;
+  logoEffect?: string; // For logo styling effects
 } 
