@@ -2,9 +2,6 @@ import { Markup } from "telegraf";
 import { MyContext } from "../types";
 import { prisma } from "../../utils/prisma";
 
-// Environment variable for free generations (ensure it's set in .env)
-const FREE_GENERATIONS = parseInt(process.env.FREE_GENERATIONS || '2', 10);
-
 export async function checkChannelSubscriptionLogic(
   ctx: MyContext,
   isCallbackCheck = false // Flag to know if this is triggered by the 'Check Subscription' button
@@ -57,11 +54,9 @@ export async function checkChannelSubscriptionLogic(
           data: {
             isSubscribed: true,
             freeGenerationsGranted: true,
-            remainingGenerations: { increment: FREE_GENERATIONS },
           },
         });
         // Notify user about granted generations
-        await ctx.reply(ctx.i18n.t('bot:subscription.free_generations_granted', { count: FREE_GENERATIONS }));
       } else if (needsToUpdateSubscriptionStatus) {
         // Just update subscription status if they were previously unsubscribed
         await prisma.user.update({ 
