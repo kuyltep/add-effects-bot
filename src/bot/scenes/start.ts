@@ -15,18 +15,14 @@ function extractUserInfo(ctx: MyContext): TelegramUserInfo {
     username: ctx.from?.username,
     chatId: ctx.chat?.id.toString() || '',
     firstName: ctx.from?.first_name,
-    language: ctx.from?.language_code?.startsWith('ru') ? 'RU' : 'EN'
+    language: ctx.from?.language_code?.startsWith('ru') ? 'RU' : 'EN',
   };
 }
 
 /**
  * Handle existing user greeting
  */
-async function handleExistingUser(
-  ctx: MyContext, 
-  user: any, 
-  referralCode?: string
-): Promise<any> {
+async function handleExistingUser(ctx: MyContext, user: any, referralCode?: string): Promise<any> {
   // Greet the returning user
   await ctx.reply(
     ctx.i18n.t('bot:greeting.welcome_back', {
@@ -57,21 +53,21 @@ async function handleExistingUser(
  * Handle new user registration
  */
 async function handleNewUser(
-  ctx: MyContext, 
-  userInfo: TelegramUserInfo, 
+  ctx: MyContext,
+  userInfo: TelegramUserInfo,
   referralCode?: string
 ): Promise<any> {
   // Generate a random password for automatic account creation
   const randomPassword = Math.random().toString(36).slice(-8);
-  
+
   // Create email based on Telegram ID
   const email = `${userInfo.telegramId}@telegram.local`;
-  
+
   // Detect user's language from Telegram client
   // const language = ctx.from?.language_code?.toLowerCase().startsWith('ru') ? 'RU' : 'EN';
   // Temporarily set default language to Russian for new users
   const language = 'RU';
-  
+
   // Logger.info('Creating new user', {
   //   telegramId: userInfo.telegramId,
   //   language,
@@ -99,10 +95,11 @@ async function handleNewUser(
       name: userInfo.firstName || '',
       remainingGenerations: newUser.remainingGenerations,
       referralCode: newUser.referralCode,
-      referralLink
+      referralLink,
     }),
     {
       parse_mode: 'HTML',
+      link_preview_options: { is_disabled: true },
       reply_markup: getMainKeyboard(ctx.i18n.locale || 'en').reply_markup,
     }
   );
@@ -116,10 +113,10 @@ async function handleNewUser(
 async function handleStartCommand(ctx: MyContext): Promise<any> {
   // Extract user information
   const userInfo = extractUserInfo(ctx);
-  
+
   // Get referral code from start parameter if available
   const referralCode = getStartParameter(ctx);
-  
+
   // Logger.info('Start command received', {
   //   telegramId: userInfo.telegramId,
   //   hasReferralParam: !!referralCode
@@ -127,7 +124,7 @@ async function handleStartCommand(ctx: MyContext): Promise<any> {
 
   // Check if user already exists
   const user = await findUserByTelegramId(userInfo.telegramId);
-  
+
   if (user) {
     return handleExistingUser(ctx, user, referralCode);
   } else {
@@ -139,9 +136,9 @@ async function handleStartCommand(ctx: MyContext): Promise<any> {
 export const startScene = new Scenes.WizardScene<MyContext>(
   'start',
   // Initial step - handle start command
-  async (ctx) => {
+  async ctx => {
     return await handleStartCommand(ctx);
   }
 );
 
-// No need for cancel command as this is a one-step scene that exits immediately 
+// No need for cancel command as this is a one-step scene that exits immediately
