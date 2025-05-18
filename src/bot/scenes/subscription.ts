@@ -65,7 +65,7 @@ async function displayPackages(ctx: MyContext): Promise<void> {
     console.log(fetchedProducts.length);
 
     const packageButtons = fetchedProducts.map(product => {
-      const buttonText = `${product.generations} ${ctx.i18n.t('bot:packages.generations')} - ${product.price} ${product.currency || 'RUB'}`;
+      const buttonText = `${product.generations} - ${product.price} ${product.currency || 'RUB'}`;
       return Markup.button.callback(buttonText, `pay_package_${product.id}`);
     });
 
