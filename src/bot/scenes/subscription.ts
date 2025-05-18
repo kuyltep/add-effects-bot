@@ -78,7 +78,6 @@ async function displayPackages(ctx: MyContext): Promise<void> {
       keyboardRows.push(row);
     }
     
-    keyboardRows.push([Markup.button.callback(ctx.i18n.t('bot:common.cancel'), 'cancel_payment_selection')]);
 
     if (ctx.callbackQuery) {
         await ctx.editMessageText(introText, {
@@ -171,11 +170,7 @@ packagesScene.action('back_to_packages', async ctx => {
   }
 });
 
-// Handle cancel button from payment selection
-packagesScene.action('cancel_payment_selection', async ctx => {
-    await ctx.answerCbQuery();
-    return exitScene(ctx, 'bot:errors.cancelled');
-});
+
 
 // Handle /cancel command
 packagesScene.command('cancel', async ctx => {
