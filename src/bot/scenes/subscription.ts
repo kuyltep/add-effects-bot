@@ -1,17 +1,28 @@
 import { Markup, Scenes } from 'telegraf';
 import { findUserByTelegramId } from '../../services/user';
-import { createPackagePayment, GENERATION_PACKAGES } from '../../services/payment';
 import { MyContext } from '../../types/bot';
 import { exitScene, handleSceneError } from '../../services/scene';
-import { translateWithPackages } from '../../utils/i18n';
+import { getProductsFromMS, updatePaymentOnMS, MSProduct } from '../../services/paymentMicroservice';
 
-// Create the packages scene (formerly subscription)
-export const packagesScene = new Scenes.BaseScene<MyContext>('packages');
+export const packagesScene = new Scenes.WizardScene<MyContext>(
+  'packages',
+  async (ctx) => {
+    try {
+      await displayPackages(ctx);
+      return ctx.wizard.next();
+    } catch (error) {
+      return handleSceneError(ctx, error, 'packages initial step');
+    }
+  },
+);
 
-/**
- * Display available generation packages
- */
+interface PackagesWizardState {
+  products?: MSProduct[];
+}
+
 async function displayPackages(ctx: MyContext): Promise<void> {
+  // Properly access wizard state
+  const wizardState = ctx.wizard.state as PackagesWizardState;
   try {
     const telegramId = ctx.from?.id.toString() || '';
     const user = await findUserByTelegramId(telegramId);
@@ -23,45 +34,74 @@ async function displayPackages(ctx: MyContext): Promise<void> {
       return;
     }
 
-    await ctx.reply(ctx.i18n.t('bot:packages.soon'), {
-      parse_mode: 'HTML',
+    const botName = process.env.BOT_USERNAME;
+    if (!botName) {
+      console.error('BOT_USERNAME not configured in .env');
+      await ctx.reply(ctx.i18n.t('bot:errors.general'));
+      return;
+    }
+    
+    let fetchedProducts: MSProduct[] = [];
+    try {
+      fetchedProducts = await getProductsFromMS(botName);
+      wizardState.products = fetchedProducts; // Store products in wizard state
+    } catch (apiError) {
+      console.error('Error fetching products from payment service:', apiError);
+      await ctx.reply(ctx.i18n.t('bot:packages.unavailable_error', { default: "Sorry, packages are currently unavailable. Please try again later."}));
+      return;
+    }
+
+    if (fetchedProducts.length === 0) {
+      await ctx.reply(ctx.i18n.t('bot:packages.no_packages_available', { default: "No packages are currently available."}), {
+        parse_mode: 'HTML',
+      });
+      return;
+    }
+    
+    const introText = ctx.i18n.t('bot:packages.intro', {
+        remainingGenerations: user.remainingGenerations
     });
-    // // Show available packages with dynamic values from config
-    // await ctx.reply(
-    //   translateWithPackages('bot:packages.intro', {
-    //     remainingGenerations: user.remainingGenerations
-    //   }, ctx.i18n.t),
-    //   {
-    //     parse_mode: 'HTML',
-    //     reply_markup: Markup.inlineKeyboard([
-    //       [
-    //         Markup.button.callback(translateWithPackages('bot:packages.package1', {}, ctx.i18n.t), 'package_package1'),
-    //         Markup.button.callback(translateWithPackages('bot:packages.package2', {}, ctx.i18n.t), 'package_package2'),
-    //       ],
-    //       [
-    //         Markup.button.callback(translateWithPackages('bot:packages.package3', {}, ctx.i18n.t), 'package_package3'),
-    //         Markup.button.callback(translateWithPackages('bot:packages.package4', {}, ctx.i18n.t), 'package_package4'),
-    //       ],
-    //     ]).reply_markup,
-    //   }
-    // );
+
+    console.log(fetchedProducts.length);
+
+    const packageButtons = fetchedProducts.map(product => {
+      const buttonText = `${product.generations} ${ctx.i18n.t('bot:packages.generations')} - ${product.price} ${product.currency || 'RUB'}`;
+      return Markup.button.callback(buttonText, `pay_package_${product.id}`);
+    });
+
+    const keyboardRows = [];
+    for (let i = 0; i < packageButtons.length; i += 2) {
+      const row = [packageButtons[i]];
+      if (i + 1 < packageButtons.length) {
+        row.push(packageButtons[i + 1]);
+      }
+      keyboardRows.push(row);
+    }
+    
+    keyboardRows.push([Markup.button.callback(ctx.i18n.t('bot:common.cancel'), 'cancel_payment_selection')]);
+
+    if (ctx.callbackQuery) {
+        await ctx.editMessageText(introText, {
+            parse_mode: 'HTML',
+            reply_markup: Markup.inlineKeyboard(keyboardRows).reply_markup,
+        });
+    } else {
+        await ctx.reply(introText, {
+            parse_mode: 'HTML',
+            reply_markup: Markup.inlineKeyboard(keyboardRows).reply_markup,
+        });
+    }
+
   } catch (error) {
     console.error('Error displaying packages:', error);
     await ctx.reply(ctx.i18n.t('bot:errors.general'));
   }
 }
 
-// Scene enter handler
-packagesScene.enter(async ctx => {
-  try {
-    await displayPackages(ctx);
-  } catch (error) {
-    return handleSceneError(ctx, error, 'packages');
-  }
-});
-
-// Handle package selection
-packagesScene.action(/package_(package4|package3|package2|package1)/, async ctx => {
+// Register action handlers directly on the wizard scene
+packagesScene.action(/pay_package_(.+)/, async ctx => {
+  // Properly access wizard state
+  const wizardState = ctx.wizard.state as PackagesWizardState;
   try {
     await ctx.answerCbQuery();
 
@@ -69,38 +109,53 @@ packagesScene.action(/package_(package4|package3|package2|package1)/, async ctx 
     const user = await findUserByTelegramId(telegramId);
 
     if (!user) {
-      await ctx.reply(ctx.i18n.t('bot:errors.not_registered'), {
-        parse_mode: 'HTML',
-      });
+      await ctx.reply(ctx.i18n.t('bot:errors.not_registered'), {parse_mode: 'HTML'});
       return ctx.scene.leave();
     }
 
-    const packageType = ctx.match[1] as keyof typeof GENERATION_PACKAGES;
-    const packageDetails = GENERATION_PACKAGES[packageType];
+    console.log(wizardState.products);
+    const productId = ctx.match[1]; // This is the Product ID
+    const products = wizardState.products;
 
-    if (!packageDetails) {
+    if (!products || products.length === 0) {
+      console.error('Products not found in wizard state during payment initiation.');
       await ctx.reply(ctx.i18n.t('bot:errors.general'));
       return ctx.scene.leave();
     }
 
-    // Create payment using the payment service
-    const { paymentUrl } = await createPackagePayment(user.id, packageType);
+    const selectedProduct = products.find(p => p.id === productId);
 
-    // Prepare parameters specific to the selected package
-    const params = {
-      package: translateWithPackages(`bot:packages.${packageType}`, {}, ctx.i18n.t),
-      price: packageDetails.price,
-      count: packageDetails.count,
-    };
+    if (!selectedProduct || !selectedProduct.paymentId || !selectedProduct.paymentLink) {
+      console.error(`Selected product (ID: ${productId}) or its paymentId/paymentLink not found in state.`);
+      await ctx.reply(ctx.i18n.t('bot:errors.general'));
+      return ctx.scene.leave();
+    }
+    
+    try {
+      await updatePaymentOnMS(selectedProduct.paymentId, { 
+        userId: user.telegramId, 
+        username: user.telegramUsername, 
+        amount: selectedProduct.price, 
+        generationsAdded: selectedProduct.generations,
+        productId: selectedProduct.id
+      });
+    } catch (patchError) {
+      console.error('Error updating payment status:', patchError);
+      await ctx.reply(ctx.i18n.t('bot:errors.payment_failed'));
+      return ctx.scene.leave();
+    }
+    
+    // Show the payment link to the user
+    const paymentPromptText = ctx.i18n.t('bot:packages.payment_redirect_prompt');
 
-    // Show payment confirmation with dynamic values
-    await ctx.reply(translateWithPackages('bot:packages.payment_prompt', params, ctx.i18n.t), {
+    await ctx.editMessageText(paymentPromptText, {
       parse_mode: 'HTML',
       reply_markup: Markup.inlineKeyboard([
-        [Markup.button.url(ctx.i18n.t('bot:packages.pay_button'), paymentUrl)],
+        [Markup.button.url(ctx.i18n.t('bot:packages.pay_button'), selectedProduct.paymentLink)],
         [Markup.button.callback(ctx.i18n.t('bot:common.cancel'), 'back_to_packages')],
       ]).reply_markup,
     });
+
   } catch (error) {
     return handleSceneError(ctx, error, 'package selection');
   }
@@ -116,7 +171,15 @@ packagesScene.action('back_to_packages', async ctx => {
   }
 });
 
+// Handle cancel button from payment selection
+packagesScene.action('cancel_payment_selection', async ctx => {
+    await ctx.answerCbQuery();
+    return exitScene(ctx, 'bot:errors.cancelled');
+});
+
 // Handle /cancel command
 packagesScene.command('cancel', async ctx => {
   return exitScene(ctx, 'bot:errors.cancelled');
 });
+
+
