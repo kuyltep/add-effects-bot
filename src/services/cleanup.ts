@@ -192,7 +192,6 @@ export async function runAllCleanupTasks(): Promise<void> {
     const results = await Promise.allSettled([
       cleanupOldFiles(3600000),
       checkSubscriptions(),
-      cleanupPayments()
     ]);
     
     // Log results
