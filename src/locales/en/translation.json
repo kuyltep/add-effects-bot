@@ -152,6 +152,7 @@
       "video_effects": "🎭 Video Effects"
     },
     "packages": {
+      "generations": "generations",
       "intro": "🛒 <b>Generation Packages</b>\n\nYou currently have <b>{{remainingGenerations}}</b> generations.\n\nSelect a package to purchase more generations:",
       "package1": "{{package1_count}} Generations - {{package1_price}}₽",
       "package2": "{{package2_count}} Generations - {{package2_price}}₽",
@@ -159,10 +160,14 @@
       "package4": "{{package4_count}} Generations - {{package4_price}}₽",
       "payment_prompt": "You selected: {{package}}\nPrice: {{price}}₽\nGenerations: {{count}}\n\nClick the button below to proceed to payment:",
       "payment_confirm": "Confirm your purchase of {{package}}.\nPrice: {{price}}₽\nGenerations: {{count}}\n\nClick the button below to proceed to payment:",
-      "pay_button": "Pay Now"
+      "pay_button": "Pay Now",
+      "unavailable_error": "Sorry, packages are currently unavailable. Please try again later.",
+      "no_packages_available": "No packages are currently available.",
+      "payment_redirect_prompt": "Please proceed to the payment page to complete your purchase."
     },
     "payments": {
-      "success": "🎉 <b>Payment Successful!</b>\n\nYour account has been credited with <b>{{count}}</b> generations worth <b>{{amount}}₽</b>.\n\nThank you for choosing our service! We appreciate your trust and are here to help you restore your precious memories."
+      "success": "🎉 <b>Payment Successful!</b>\n\nYour account has been credited with <b>{{count}}</b> generations worth <b>{{amount}}₽</b>.\n\nThank you for choosing our service! We appreciate your trust and are here to help you restore your precious memories.",
+      "success_microservice": "🎉 <b>Payment Successful!</b>\n\nYour account has been credited with <b>{{count}}</b> generations worth <b>{{amountPaid}} {{currency}}</b>.\n\nYou purchased: {{productName}}\n\nThank you for choosing our service! We appreciate your trust."
     },
     "settings": {
       "info": "⚙️ <b>Current Settings</b>\n\n• <b>Resolution:</b> {{resolution}} ({{width}}x{{height}})\n",
