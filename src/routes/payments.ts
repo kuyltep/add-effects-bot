@@ -1,172 +1,70 @@
 import { FastifyInstance, FastifyPluginOptions } from 'fastify';
-import crypto from 'crypto';
 import { prisma } from '../utils/prisma';
-import { processRobokassaPayment } from '../services/payment';
+import { addGenerationsToUser } from '../services/payment';
+import { sendPaymentSuccessNotification } from '../services/payment';
 
 export default async function (fastify: FastifyInstance, options: FastifyPluginOptions) {
-  // Get payment plans
-  fastify.get('/plans', async (request, reply) => {
+
+
+  // Payment service webhook for payment notifications
+  fastify.post('/webhook', async (request, reply) => {
     try {
-      // Define the available subscription plans
-      const plans = [
-        {
-          id: 'monthly',
-          name: 'Monthly Subscription',
-          description: 'Unlimited generations for 30 days',
-          price: 9.99,
-          currency: 'USD',
-          type: 'subscription',
-          days: 30,
-        },
-        {
-          id: 'yearly',
-          name: 'Yearly Subscription',
-          description: 'Unlimited generations for 365 days',
-          price: 99.99,
-          currency: 'USD',
-          type: 'subscription',
-          days: 365,
-        },
-        {
-          id: 'pack10',
-          name: '10 Generations Pack',
-          description: '10 image generations',
-          price: 4.99,
-          currency: 'USD',
-          type: 'pack',
-          count: 10,
-        },
-        {
-          id: 'pack50',
-          name: '50 Generations Pack',
-          description: '50 image generations',
-          price: 19.99,
-          currency: 'USD',
-          type: 'pack',
-          count: 50,
-        },
-      ];
-
-      return reply.send({ plans });
-    } catch (error) {
-      request.log.error(error);
-      return reply.status(500).send({ error: 'Failed to get payment plans' });
-    }
-  });
-
-  // Create a payment for Robokassa
-  fastify.post(
-    '/create',
-    {
-      preHandler: (fastify as any).authenticate,
-    },
-    async (request, reply) => {
-      try {
-        const userId = (request.user as { id: string }).id;
-        const { planId } = request.body as { planId: string };
-
-        // Get the plan details (in a real implementation, this would be from a database)
-        const plans = {
-          monthly: {
-            name: 'Monthly Subscription',
-            price: 9.99,
-            type: 'subscription',
-            days: 30,
-          },
-          yearly: {
-            name: 'Yearly Subscription',
-            price: 99.99,
-            type: 'subscription',
-            days: 365,
-          },
-          pack10: {
-            name: '10 Generations Pack',
-            price: 4.99,
-            type: 'pack',
-            count: 10,
-          },
-          pack50: {
-            name: '50 Generations Pack',
-            price: 19.99,
-            type: 'pack',
-            count: 50,
-          },
-        };
-
-        const plan = plans[planId as keyof typeof plans];
-        if (!plan) {
-          return reply.status(400).send({ error: 'Invalid plan ID' });
-        }
-
-        // Create a payment record
-        const payment = await prisma.payment.create({
-          data: {
-            userId,
-            amount: plan.price,
-            status: 'pending',
-            subscriptionType: plan.type === 'subscription' ? planId : null,
-            subscriptionDays: plan.type === 'subscription' ? (plan as any).days : null,
-            generationsAdded: plan.type === 'pack' ? (plan as any).count : null,
-          },
-        });
-
-        // Generate Robokassa payment URL
-        // In a real implementation, you would use Robokassa's API
-        const robokassaLogin = process.env.ROBOKASSA_LOGIN;
-        const robokassaPassword1 = process.env.ROBOKASSA_PASSWORD1;
-        const isTest = process.env.ROBOKASSA_TEST_MODE === 'true';
-
-        const amount = payment.amount.toFixed(2);
-        const description = `Payment for ${plan.name}`;
-        const signature = crypto
-          .createHash('md5')
-          .update(`${robokassaLogin}:${amount}:${payment.id}:${robokassaPassword1}`)
-          .digest('hex');
-
-        const robokassaUrl = 
-         'https://auth.robokassa.ru/Merchant/Index.aspx';
-
-        const paymentUrl = `${robokassaUrl}?MerchantLogin=${robokassaLogin}&OutSum=${amount}&InvId=${payment.id}&Description=${encodeURIComponent(description)}&SignatureValue=${signature}&IsTest=${isTest ? 1 : 0}`;
-
-        return reply.send({
-          payment: {
-            id: payment.id,
-            amount: payment.amount,
-            status: payment.status,
-          },
-          paymentUrl,
-        });
-      } catch (error) {
-        request.log.error(error);
-        return reply.status(500).send({ error: 'Failed to create payment' });
+      // Validate API key from the payment microservice
+      const apiKey = request.headers['x-api-key'] as string;
+      if (!apiKey || apiKey !== process.env.API_KEY) {
+        request.log.warn('Invalid API key for payment webhook');
+        return reply.status(401).send({ error: 'Unauthorized' });
       }
-    }
-  );
 
-  // Robokassa callback for payment notifications
-  fastify.post('/robokassa/callback', async (request, reply) => {
-    try {
-
-
-      const { OutSum, InvId, SignatureValue } = request.body as {
-        OutSum: string;
-        InvId: string;
-        SignatureValue: string;
+      const { paymentId, userId, status, amount, generationsAdded } = request.body as {
+        paymentId: string;
+        userId: string;
+        status: string;
+        amount: number;
+        generationsAdded: number;
       };
 
-      
-
-      // Process payment using our payment service
-      const success = await processRobokassaPayment(OutSum, InvId, SignatureValue);
-
-      if (!success) {
-        return reply.status(400).send('Invalid payment data');
+      // Validate required parameters
+      if (!paymentId || !userId || !status) {
+        request.log.error('Missing required parameters in payment webhook');
+        return reply.status(400).send({ error: 'Missing required parameters' });
       }
 
-      return reply.send('OK');
+      request.log.info(`Received payment webhook for user ${userId}, status: ${status}`);
+
+      // Only process completed payments
+      if (status !== 'PAID') {
+        return reply.send({ success: true, message: 'Payment status acknowledged' });
+      }
+
+      // Find the user in our database
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+      });
+
+      if (!user) {
+        request.log.error(`User not found: ${userId}`);
+        return reply.status(400).send({ error: 'User not found' });
+      }
+
+
+      // Add generations to user's account
+      if (generationsAdded) {
+        await addGenerationsToUser(userId, generationsAdded);
+        
+        // Notify user via Telegram
+        sendPaymentSuccessNotification({
+          userId,
+          telegramId: user.telegramId,
+          generationsAdded,
+          amount,
+        })
+      }
+
+      return reply.send({ success: true });
     } catch (error) {
-      request.log.error(error);
-      return reply.status(500).send('Error processing payment');
+      request.log.error('Error processing payment webhook', error);
+      return reply.status(500).send({ error: 'Error processing payment' });
     }
   });
 
