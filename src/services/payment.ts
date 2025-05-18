@@ -3,7 +3,6 @@ import { prisma } from '../utils/prisma';
 import { paymentConfig, packagesConfig } from '../config';
 import { User } from '@prisma/client';
 import { createRedisPublisher } from '../utils/redis';
-import fetch from 'node-fetch';
 
 /**
  * Available generation packages
@@ -17,71 +16,6 @@ export type GenerationPackageType = keyof typeof GENERATION_PACKAGES;
 
 
 
-/**
- * Generate Robokassa payment URL
- * @param paymentId Payment ID
- * @param amount Payment amount
- * @param description Payment description
- * @returns Robokassa payment URL
- */
-function generateRobokassaUrl(paymentId: string | number, amount: number, description: string): string {
-  // Get Robokassa credentials
-  const { login, password1, testMode } = paymentConfig.robokassa;
-
-  // Format amount to 2 decimal places
-  const formattedAmount = amount.toFixed(2);
-
-  // Generate signature (MD5 hash)
-  const signature = crypto
-    .createHash('md5')
-    .update(`${login}:${formattedAmount}:${paymentId}:${password1}`)
-    .digest('hex').toLowerCase();
-
-  // Use test or production URL based on config
-  const baseUrl = 'https://auth.robokassa.ru/Merchant/Index.aspx';
-
-  // Build and encode payment URL
-  return `${baseUrl}?MerchantLogin=${login}&OutSum=${formattedAmount}&InvId=${paymentId}&Description=${encodeURIComponent(description)}&SignatureValue=${signature}&IsTest=${testMode ? 1 : 0}`;
-}
-
-
-
-/**
- * Verify Robokassa signature
- * @param outSum Payment amount
- * @param invId Payment ID
- * @param signatureValue Signature from Robokassa
- * @returns Boolean indicating if signature is valid
- */
-function verifyRobokassaSignature(outSum: string, invId: string, signatureValue: string): boolean {
-  try {
-    // Get Robokassa credentials
-    const { password2 } = paymentConfig.robokassa;
-
-    // Generate expected signature
-    const expectedSignature = crypto
-      .createHash('md5')
-      .update(`${outSum}:${invId}:${password2}`)
-      .digest('hex').toLowerCase();
-
-    // Compare signatures
-    return signatureValue.toLowerCase() === expectedSignature;
-  } catch (error) {
-    console.error(error, {
-      context: 'payment-service',
-      method: 'verifyRobokassaSignature',
-      invId
-    });
-    return false;
-  }
-}
-
-/**
- * Add generations to a user's account
- * @param userId User ID
- * @param count Number of generations to add
- * @returns Updated user
- */
 export async function addGenerationsToUser(userId: string, count: number): Promise<User> {
   try {
     // Update user's generation count

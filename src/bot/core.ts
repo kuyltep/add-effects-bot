@@ -109,7 +109,6 @@ function setupRedisSubscriber() {
     'bot:crease_error_choice',
     'bot:payment_success',
     'bot:send_effect',
-    'bot:notify_user_payment_success'
   );
   
   // Handle messages
@@ -198,10 +197,6 @@ function setupRedisSubscriber() {
           await sendPaymentSuccessNotification(data);
           break;
           
-        case 'bot:notify_user_payment_success':
-          // Handle payment success notification from the payment microservice
-          await sendPaymentSuccessNotificationFromMicroservice(data);
-          break;
           
         case 'bot:send_effect':
           // Send effect results to user
@@ -528,48 +523,6 @@ async function sendEffectResults(data) {
   }
 }
 
-// Add a new function to handle payment success notifications from the microservice
-async function sendPaymentSuccessNotificationFromMicroservice(data: {
-  telegramId: string;
-  language: string;
-  generationsAdded: number;
-  amountPaid?: number;
-  currency?: string;
-  productName?: string;
-}) {
-  try {
-    const { telegramId, language, generationsAdded, amountPaid, currency, productName } = data;
-    
-    if (!telegramId || !generationsAdded) {
-      console.error('Missing required data for payment success notification from microservice:', data);
-      return;
-    }
-    
-    // Use the appropriate language for the message
-    const i18n = i18next.getFixedT(language || 'en');
-    
-    // Format the message with all available information
-    const messageText = i18n('bot:payments.success_microservice', {
-      count: generationsAdded,
-      amountPaid: amountPaid || '',
-      currency: currency || '',
-      productName: productName || '',
-      default: `🎉 <b>Payment Successful!</b>\n\nYour account has been credited with <b>${generationsAdded}</b> generations${amountPaid ? ` worth <b>${amountPaid} ${currency || ''}</b>` : ''}.${productName ? `\n\nYou purchased: ${productName}` : ''}\n\nThank you for your purchase!`
-    });
-    
-    // Send the message to the user
-    await bot.telegram.sendMessage(telegramId, messageText, {
-      parse_mode: 'HTML',
-      reply_markup: Markup.inlineKeyboard([
-        [Markup.button.callback(i18n('bot:buttons.generate_more', { default: '🖼️ Generate More' }), 'start_generation')],
-      ]).reply_markup
-    });
-    
-    console.log(`Payment success notification sent to user ${telegramId} for ${generationsAdded} generations`);
-  } catch (error) {
-    console.error('Error sending payment success notification from microservice:', error);
-  }
-}
 
 export async function stopBot() {
   console.log('Stopping bot...');
