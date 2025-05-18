@@ -2,7 +2,6 @@ import crypto from 'crypto';
 import { prisma } from '../utils/prisma';
 import { paymentConfig, packagesConfig } from '../config';
 import { User } from '@prisma/client';
-import { Logger } from '../utils/rollbar.logger';
 import { createRedisPublisher } from '../utils/redis';
 import fetch from 'node-fetch';
 
@@ -16,55 +15,7 @@ export const GENERATION_PACKAGES = packagesConfig;
  */
 export type GenerationPackageType = keyof typeof GENERATION_PACKAGES;
 
-/**
- * Create a Robokassa payment for a generation package
- * @param userId User ID
- * @param packageType Generation package type
- * @returns Payment object with URL
- */
-export async function createPackagePayment(
-  userId: string,
-  packageType: GenerationPackageType
-): Promise<{ payment: any; paymentUrl: string }> {
-  try {
-    // Get package details
-    const packageDetails = GENERATION_PACKAGES[packageType];
-    if (!packageDetails) {
-      throw new Error(`Invalid package type: ${packageType}`);
-    }
 
-    // Create payment record in database
-    const payment = await prisma.payment.create({
-      data: {
-        userId,
-        amount: packageDetails.price,
-        status: 'pending',
-        generationsAdded: packageDetails.count,
-      },
- 
-    });
-
-    // Generate Robokassa payment URL
-    const paymentUrl = generateRobokassaUrl(payment.transactionId, packageDetails.price, `Generation Package: ${packageDetails.name}`);
-
-    return {
-      payment: {
-        id: payment.id,
-        amount: payment.amount,
-        status: payment.status,
-      },
-      paymentUrl,
-    };
-  } catch (error) {
-    Logger.error(error, {
-      context: 'payment-service',
-      method: 'createPackagePayment',
-      userId,
-      packageType
-    });
-    throw error;
-  }
-}
 
 /**
  * Generate Robokassa payment URL
@@ -93,93 +44,7 @@ function generateRobokassaUrl(paymentId: string | number, amount: number, descri
   return `${baseUrl}?MerchantLogin=${login}&OutSum=${formattedAmount}&InvId=${paymentId}&Description=${encodeURIComponent(description)}&SignatureValue=${signature}&IsTest=${testMode ? 1 : 0}`;
 }
 
-/**
- * Process a Robokassa payment notification
- * @param outSum Payment amount
- * @param invId Payment ID
- * @param signatureValue Signature from Robokassa
- * @returns Boolean indicating if payment was successfully processed
- */
-export async function processRobokassaPayment(
-  outSum: string, 
-  invId: string, 
-  signatureValue: string
-): Promise<boolean> {
-  try {
-    // Verify the signature
-    const isValid = verifyRobokassaSignature(outSum, invId, signatureValue);
 
-    if (!isValid) {
-      Logger.error('Invalid Robokassa signature', {
-        context: 'payment-service',
-        method: 'processRobokassaPayment',
-        invId
-      });
-      return false;
-    }
-
-    // Find the payment in our database
-    const payment = await prisma.payment.findUnique({
-      where: { transactionId: +invId },
-      include: { user: true },
-    });
-
-
-
-    if (!payment) {
-      Logger.error(`Payment not found: ${invId}`, {
-        context: 'payment-service',
-        method: 'processRobokassaPayment'
-      });
-      return false;
-    }
-
-    if (payment.status === 'completed') {
-      return true;
-    }
-
-    // Update payment status
-    await prisma.payment.update({
-      where: { transactionId: +invId },
-      data: { status: 'completed' },
-    });
-
-    // Add generations to user's account
-    if (payment.generationsAdded) {
-      await addGenerationsToUser(payment.userId, payment.generationsAdded);
-      
-      // Get user with telegram ID
-      const user = await prisma.user.findUnique({
-        where: { id: payment.userId }      });
-      
-      // Send notification via Redis
-      await sendPaymentSuccessNotification({
-        userId: payment.userId,
-        telegramId: user?.telegramId || '',
-        generationsAdded: payment.generationsAdded,
-        amount: payment.amount
-      });
-      
-      // Send notification to external payment service
-      await notifyExternalPaymentService({
-        amount: payment.amount,
-        generationsAdded: payment.generationsAdded,
-        botName: process.env.BOT_USERNAME || '',
-        user: user.telegramId,
-        username: user.telegramUsername
-      });
-    }
-
-    return true;
-  } catch (error) {
-    Logger.error(error, {
-      context: 'payment-service',
-      method: 'processRobokassaPayment',
-      invId
-    });
-    return false;
-  }
-}
 
 /**
  * Verify Robokassa signature
@@ -202,7 +67,7 @@ function verifyRobokassaSignature(outSum: string, invId: string, signatureValue:
     // Compare signatures
     return signatureValue.toLowerCase() === expectedSignature;
   } catch (error) {
-    Logger.error(error, {
+    console.error(error, {
       context: 'payment-service',
       method: 'verifyRobokassaSignature',
       invId
@@ -229,17 +94,10 @@ export async function addGenerationsToUser(userId: string, count: number): Promi
       },
     });
 
-    // Logger.info(`Added ${count} generations to user ${userId}`, {
-    //   context: 'payment-service',
-    //   method: 'addGenerationsToUser'
-    // });
+    console.log(`Added ${count} generations to user ${userId}`);
     return user;
   } catch (error) {
-    Logger.error(error, {
-      context: 'payment-service', 
-      method: 'addGenerationsToUser',
-      userId
-    });
+    console.error('Error adding generations to user:', error, { userId });
     throw error;
   }
 }
@@ -253,7 +111,7 @@ export async function cleanupPendingPayments(olderThanMs = 3600000): Promise<num
   try {
     // Validate input
     if (olderThanMs <= 0) {
-      Logger.warn('Invalid cleanup time specified, using default 1 hour', {
+      console.warn('Invalid cleanup time specified, using default 1 hour', {
         context: 'payment-service',
         method: 'cleanupPendingPayments'
       });
@@ -279,7 +137,7 @@ export async function cleanupPendingPayments(olderThanMs = 3600000): Promise<num
     return result.count;
   } catch (error) {
     // Enhanced error logging with more details
-    Logger.error(error, {
+    console.error(error, {
       context: 'payment-service',
       method: 'cleanupPendingPayments',
       timestamp: new Date().toISOString()
@@ -292,7 +150,7 @@ export async function cleanupPendingPayments(olderThanMs = 3600000): Promise<num
  * Send payment success notification via Redis
  * @param data Payment success notification data
  */
-async function sendPaymentSuccessNotification(data: {
+export async function sendPaymentSuccessNotification(data: {
   userId: string;
   telegramId: string;
   generationsAdded: number;
@@ -309,7 +167,7 @@ async function sendPaymentSuccessNotification(data: {
     await redisPublisher.quit();
     
   } catch (error) {
-    Logger.error(error, {
+    console.error(error, {
       context: 'payment-service',
       method: 'sendPaymentSuccessNotification',
       userId: data.userId
@@ -317,51 +175,3 @@ async function sendPaymentSuccessNotification(data: {
   }
 }
 
-/**
- * Notify external payment service about successful payment
- * @param data Payment notification data
- */
-async function notifyExternalPaymentService(data: {
-  amount: number;
-  generationsAdded: number;
-  botName: string;
-  user: string;
-  username: string
-}): Promise<void> {
-  try {
-    const paymentNotifyServiceUrl = process.env.PAYMENT_NOTIFY_SERVICE_URL;
-    
-    if (!paymentNotifyServiceUrl) {
-      Logger.error('Payment notify service URL not defined in environment variables', {
-        context: 'payment-service',
-        method: 'notifyExternalPaymentService'
-      });
-      return;
-    }
-    
-    const notifyUrl = `${paymentNotifyServiceUrl}/notify`;
-    
-    const response = await fetch(notifyUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(data)
-    });
-    
-    if (!response.ok) {
-      Logger.error('Payment notify service doesn\'t work. Check the service', {
-        context: 'payment-service',
-        method: 'notifyExternalPaymentService',
-        data
-      });
-    }
-  
-  } catch (error) {
-    Logger.error(error, {
-      context: 'payment-service',
-      method: 'notifyExternalPaymentService',
-      data
-    });
-  }
-} 
