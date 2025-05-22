@@ -344,7 +344,7 @@ photoHandler.on('message', async ctx => {
 initialOptionHandler.action('select_photo_styling', async (ctx) => {
   await ctx.answerCbQuery();
   await showEffectSelection(ctx);
-  return ctx.wizard.next(); // Move to effect selection handler step
+  return ctx.wizard.selectStep(3); // Move to effect selection handler step
 });
 
 initialOptionHandler.action('select_video_effects', async (ctx) => {
