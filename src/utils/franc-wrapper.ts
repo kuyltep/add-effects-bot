@@ -15,7 +15,7 @@ export async function detectLanguageWithFranc(text: string): Promise<string> {
     if (!francModule) {
       francModule = await import('franc');
     }
-  
+
     return francModule.franc(text);
   } catch (error) {
     // Log error and return English as fallback

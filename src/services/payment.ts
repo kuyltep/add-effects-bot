@@ -14,8 +14,6 @@ export const GENERATION_PACKAGES = packagesConfig;
  */
 export type GenerationPackageType = keyof typeof GENERATION_PACKAGES;
 
-
-
 export async function addGenerationsToUser(userId: string, count: number): Promise<User> {
   try {
     // Update user's generation count
@@ -23,8 +21,8 @@ export async function addGenerationsToUser(userId: string, count: number): Promi
       where: { id: userId },
       data: {
         remainingGenerations: {
-          increment: count
-        }
+          increment: count,
+        },
       },
     });
 
@@ -47,14 +45,14 @@ export async function cleanupPendingPayments(olderThanMs = 3600000): Promise<num
     if (olderThanMs <= 0) {
       console.warn('Invalid cleanup time specified, using default 1 hour', {
         context: 'payment-service',
-        method: 'cleanupPendingPayments'
+        method: 'cleanupPendingPayments',
       });
       olderThanMs = 3600000;
     }
-    
+
     // Calculate the cutoff date
     const cutoffDate = new Date(Date.now() - olderThanMs);
-    
+
     // First count how many will be affected (for logging)
 
     // Delete pending payments older than the cutoff date
@@ -62,11 +60,11 @@ export async function cleanupPendingPayments(olderThanMs = 3600000): Promise<num
       where: {
         status: 'pending',
         createdAt: {
-          lt: cutoffDate
-        }
-      }
+          lt: cutoffDate,
+        },
+      },
     });
-    
+
     // Log with additional details for monitoring
     return result.count;
   } catch (error) {
@@ -74,7 +72,7 @@ export async function cleanupPendingPayments(olderThanMs = 3600000): Promise<num
     console.error(error, {
       context: 'payment-service',
       method: 'cleanupPendingPayments',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
     return 0;
   }
@@ -92,20 +90,15 @@ export async function sendPaymentSuccessNotification(data: {
 }): Promise<void> {
   try {
     const redisPublisher = createRedisPublisher();
-    
-    await redisPublisher.publish(
-      'bot:payment_success',
-      JSON.stringify(data)
-    );
-    
+
+    await redisPublisher.publish('bot:payment_success', JSON.stringify(data));
+
     await redisPublisher.quit();
-    
   } catch (error) {
     console.error(error, {
       context: 'payment-service',
       method: 'sendPaymentSuccessNotification',
-      userId: data.userId
+      userId: data.userId,
     });
   }
 }
-

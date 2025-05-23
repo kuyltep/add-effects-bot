@@ -17,4 +17,4 @@ export interface ReferralProcessResult {
   referrerId?: string;
   invitedUserId?: string;
   error?: string;
-} 
+}

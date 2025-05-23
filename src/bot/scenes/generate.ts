@@ -1,23 +1,14 @@
 import { Composer, Context, Markup, Scenes } from 'telegraf';
-import { 
-  MyContext, 
-  GenerateWizardState,
-  EffectType
-} from '../../types';
-import { 
-  canUserGenerate,
-  queueImageGenerationJob
-} from '../../services/generation';
-import { 
-  initializeWizardState,
-  exitScene
-} from '../../services/scene';
+import { MyContext, GenerateWizardState, EffectType } from '../../types';
+import { canUserGenerate, queueImageGenerationJob } from '../../services/generation';
+import { initializeWizardState, exitScene } from '../../services/scene';
 import { Logger } from '../../utils/rollbar.logger';
 
 // STEP HANDLERS
 const initialOptionHandler = new Composer<MyContext>();
 const effectSelectorHandler = new Composer<MyContext>();
 const logoEffectSelectorHandler = new Composer<MyContext>();
+const bannerEffectSelectorHandler = new Composer<MyContext>();
 const photoHandler = new Composer<MyContext>();
 
 const effectsPerPage = 8;
@@ -48,7 +39,16 @@ const logoEffectOptions = [
   'luminous_fluid',
   'molten_glass',
   'on_wood',
-  'organic'
+  'organic',
+];
+
+const bannerEffectOptions = [
+  'banner_without_effects',
+  'banner_in_the_haze',
+  'luminous_fluid',
+  'molten_glass',
+  'on_wood',
+  'organic',
 ];
 
 // WIZARD STEP TRANSITIONS & HANDLERS
@@ -60,18 +60,17 @@ async function showInitialOptions(ctx: MyContext): Promise<void> {
   const stylizePhotoText = ctx.i18n.t('bot:generate.effect_photo');
   const videoEffectsText = ctx.i18n.t('bot:generate.effect_video');
   const stylizeLogoText = ctx.i18n.t('bot:generate.stylize_logo');
-    
-  await ctx.reply(
-    ctx.i18n.t('bot:generate.select_option'),
-    {
-      parse_mode: 'HTML',
-      reply_markup: Markup.inlineKeyboard([
-        [Markup.button.callback(stylizePhotoText, 'select_photo_styling')],
-        [Markup.button.callback(videoEffectsText, 'select_video_effects')],
-        [Markup.button.callback(stylizeLogoText, 'select_logo_styling')]
-      ]).reply_markup
-    }
-  );
+  const stylizeBannerText = ctx.i18n.t('bot:generate.stylize_banner');
+
+  await ctx.reply(ctx.i18n.t('bot:generate.select_option'), {
+    parse_mode: 'HTML',
+    reply_markup: Markup.inlineKeyboard([
+      [Markup.button.callback(stylizePhotoText, 'select_photo_styling')],
+      [Markup.button.callback(videoEffectsText, 'select_video_effects')],
+      [Markup.button.callback(stylizeLogoText, 'select_logo_styling')],
+      [Markup.button.callback(stylizeBannerText, 'select_banner_styling')],
+    ]).reply_markup,
+  });
 }
 
 /**
@@ -85,10 +84,10 @@ async function showEffectSelection(ctx: MyContext): Promise<void> {
   const end = start + effectsPerPage;
   const pageEffects = effectOptions.slice(start, end);
 
-  const effectButtons = pageEffects.map(option => 
+  const effectButtons = pageEffects.map(option =>
     Markup.button.callback(ctx.i18n.t(option.labelKey), `select_effect_${option.key}`)
   );
-  
+
   const keyboardRows = [];
   for (let i = 0; i < effectButtons.length; i += 2) {
     const row = [effectButtons[i]];
@@ -100,13 +99,13 @@ async function showEffectSelection(ctx: MyContext): Promise<void> {
 
   const navigationButtons = [];
 
-    navigationButtons.push(Markup.button.callback('⬅️', 'previous_page'));
-    navigationButtons.push(Markup.button.callback('➡️', 'next_page'));
+  navigationButtons.push(Markup.button.callback('⬅️', 'previous_page'));
+  navigationButtons.push(Markup.button.callback('➡️', 'next_page'));
 
   if (navigationButtons.length > 0) {
     keyboardRows.push(navigationButtons);
   }
-  
+
   const messageText = ctx.i18n.t('bot:generate.select_effect_prompt');
   const replyMarkup = Markup.inlineKeyboard(keyboardRows).reply_markup;
 
@@ -114,22 +113,22 @@ async function showEffectSelection(ctx: MyContext): Promise<void> {
     // Check if the message to edit exists by trying to edit it with the same content initially
     // This is a common pattern to avoid errors if the message was deleted.
     if (ctx.callbackQuery?.message) {
-        await ctx.editMessageText(messageText, {
-            parse_mode: 'HTML',
-            reply_markup: replyMarkup,
-        });
+      await ctx.editMessageText(messageText, {
+        parse_mode: 'HTML',
+        reply_markup: replyMarkup,
+      });
     } else {
-        await ctx.reply(messageText, {
-            parse_mode: 'HTML',
-            reply_markup: replyMarkup,
-        });
+      await ctx.reply(messageText, {
+        parse_mode: 'HTML',
+        reply_markup: replyMarkup,
+      });
     }
   } catch (error) {
     Logger.warn('Failed to edit or send effect selection message, sending new one.', { error });
     // Fallback to sending a new message if editing fails for any reason
     await ctx.reply(messageText, {
-        parse_mode: 'HTML',
-        reply_markup: replyMarkup,
+      parse_mode: 'HTML',
+      reply_markup: replyMarkup,
     });
   }
 }
@@ -144,14 +143,14 @@ async function showLogoEffectSelection(ctx: MyContext): Promise<void> {
     luminous_fluid: ctx.i18n.t('bot:generate.logo_effect_luminous_fluid'),
     molten_glass: ctx.i18n.t('bot:generate.logo_effect_molten_glass'),
     on_wood: ctx.i18n.t('bot:generate.logo_effect_on_wood'),
-    organic: ctx.i18n.t('bot:generate.logo_effect_organic')
+    organic: ctx.i18n.t('bot:generate.logo_effect_organic'),
   };
 
   // Create buttons for each logo effect
-  const effectButtons = logoEffectOptions.map(effect => 
+  const effectButtons = logoEffectOptions.map(effect =>
     Markup.button.callback(effectLabels[effect], `select_logo_effect_${effect}`)
   );
-  
+
   // Arrange buttons in two columns
   const keyboardRows = [];
   for (let i = 0; i < effectButtons.length; i += 1) {
@@ -159,9 +158,8 @@ async function showLogoEffectSelection(ctx: MyContext): Promise<void> {
     keyboardRows.push(row);
   }
 
-  
   const messageText = ctx.i18n.t('bot:generate.select_logo_style_prompt');
-    
+
   const replyMarkup = Markup.inlineKeyboard(keyboardRows).reply_markup;
 
   try {
@@ -177,7 +175,60 @@ async function showLogoEffectSelection(ctx: MyContext): Promise<void> {
       });
     }
   } catch (error) {
-    Logger.warn('Failed to edit or send logo effect selection message, sending new one.', { error });
+    Logger.warn('Failed to edit or send logo effect selection message, sending new one.', {
+      error,
+    });
+    await ctx.reply(messageText, {
+      parse_mode: 'HTML',
+      reply_markup: replyMarkup,
+    });
+  }
+}
+
+async function showBannerEffectSelection(ctx: MyContext): Promise<void> {
+  // Create localized button labels
+  const effectLabels = {
+    banner_without_effects: ctx.i18n.t('bot:generate.banner_effect_without_effects'),
+
+    banner_in_the_haze: ctx.i18n.t('bot:generate.banner_effect_banner_in_the_haze'),
+    luminous_fluid: ctx.i18n.t('bot:generate.banner_effect_luminous_fluid'),
+    molten_glass: ctx.i18n.t('bot:generate.banner_effect_molten_glass'),
+    on_wood: ctx.i18n.t('bot:generate.banner_effect_on_wood'),
+    organic: ctx.i18n.t('bot:generate.banner_effect_organic'),
+  };
+
+  // Create buttons for each banner effect
+  const effectButtons = bannerEffectOptions.map(effect =>
+    Markup.button.callback(effectLabels[effect], `select_logo_effect_${effect}`)
+  );
+
+  // Arrange buttons
+  const keyboardRows = [];
+  for (let i = 0; i < effectButtons.length; i += 1) {
+    const row = [effectButtons[i]];
+    keyboardRows.push(row);
+  }
+
+  const messageText = ctx.i18n.t('bot:generate.select_banner_style_prompt');
+
+  const replyMarkup = Markup.inlineKeyboard(keyboardRows).reply_markup;
+
+  try {
+    if (ctx.callbackQuery?.message) {
+      await ctx.editMessageText(messageText, {
+        parse_mode: 'HTML',
+        reply_markup: replyMarkup,
+      });
+    } else {
+      await ctx.reply(messageText, {
+        parse_mode: 'HTML',
+        reply_markup: replyMarkup,
+      });
+    }
+  } catch (error) {
+    Logger.warn('Failed to edit or send banner effect selection message, sending new one.', {
+      error,
+    });
     await ctx.reply(messageText, {
       parse_mode: 'HTML',
       reply_markup: replyMarkup,
@@ -188,68 +239,109 @@ async function showLogoEffectSelection(ctx: MyContext): Promise<void> {
 /**
  * Handles the selection of an effect.
  */
-effectSelectorHandler.action(/select_effect_(claymation|ghibli|pixar|bratz|cat|dog|sticker|new_disney|old_disney|mitchells|dreamworks|plushify|ghiblify|cartoonify)/, async (ctx) => {
-  await ctx.answerCbQuery();
-  const state = ctx.wizard.state as GenerateWizardState;
-  const selectedEffect = ctx.match[1] as EffectType;
+effectSelectorHandler.action(
+  /select_effect_(claymation|ghibli|pixar|bratz|cat|dog|sticker|new_disney|old_disney|mitchells|dreamworks|plushify|ghiblify|cartoonify)/,
+  async ctx => {
+    await ctx.answerCbQuery();
+    const state = ctx.wizard.state as GenerateWizardState;
+    const selectedEffect = ctx.match[1] as EffectType;
 
-  if (!state?.generationData) {
-    Logger.warn('State missing in effect selection', { userId: ctx.from?.id });
-    return exitWithError(ctx, 'bot:errors.general');
+    if (!state?.generationData) {
+      Logger.warn('State missing in effect selection', { userId: ctx.from?.id });
+      return exitWithError(ctx, 'bot:errors.general');
+    }
+
+    // Store the selected effect
+    state.generationData.effect = selectedEffect;
+
+    // Prompt for photo
+    try {
+      await ctx.editMessageText(ctx.i18n.t('bot:generate.send_photo_for_effect'), {
+        parse_mode: 'HTML',
+      });
+    } catch (error) {
+      // If editing fails (e.g., message too old), send a new message
+      await ctx.reply(ctx.i18n.t('bot:generate.send_photo_for_effect'), {
+        parse_mode: 'HTML',
+      });
+    }
+
+    // Move to the photo handler step
+    return ctx.wizard.next();
   }
-
-  // Store the selected effect
-  state.generationData.effect = selectedEffect;
-
-  // Prompt for photo
-  try {
-     await ctx.editMessageText(ctx.i18n.t('bot:generate.send_photo_for_effect'), {
-       parse_mode: 'HTML',
-     });
-  } catch (error) {
-     // If editing fails (e.g., message too old), send a new message
-     await ctx.reply(ctx.i18n.t('bot:generate.send_photo_for_effect'), {
-       parse_mode: 'HTML',
-     });
-  }
-
-  // Move to the photo handler step
-  return ctx.wizard.next();
-});
+);
 
 /**
  * Handles the selection of a logo effect.
  */
-logoEffectSelectorHandler.action(/select_logo_effect_(logo_in_the_haze|luminous_fluid|molten_glass|on_wood|organic)/, async (ctx) => {
-  await ctx.answerCbQuery();
-  const state = ctx.wizard.state as GenerateWizardState;
-  const selectedLogoEffect = ctx.match[1];
+logoEffectSelectorHandler.action(
+  /select_logo_effect_(logo_in_the_haze|luminous_fluid|molten_glass|on_wood|organic)/,
+  async ctx => {
+    await ctx.answerCbQuery();
+    const state = ctx.wizard.state as GenerateWizardState;
+    const selectedLogoEffect = ctx.match[1];
 
-  if (!state?.generationData) {
-    Logger.warn('State missing in logo effect selection', { userId: ctx.from?.id });
-    return exitWithError(ctx, 'bot:errors.general');
+    if (!state?.generationData) {
+      Logger.warn('State missing in logo effect selection', { userId: ctx.from?.id });
+      return exitWithError(ctx, 'bot:errors.general');
+    }
+
+    // Store the selected logo effect
+    state.generationData.logoEffect = selectedLogoEffect;
+
+    // Prompt for photo
+    try {
+      await ctx.editMessageText(ctx.i18n.t('bot:generate.send_logo_for_effect'), {
+        parse_mode: 'HTML',
+      });
+    } catch (error) {
+      // If editing fails, send a new message
+      await ctx.reply(ctx.i18n.t('bot:generate.send_logo_for_effect'), {
+        parse_mode: 'HTML',
+      });
+    }
+
+    // Move to the photo handler step
+    return ctx.wizard.selectStep(4);
   }
+);
 
-  // Store the selected logo effect
-  state.generationData.logoEffect = selectedLogoEffect;
+/**
+ * Handles the selection of a banner effect.
+ */
+bannerEffectSelectorHandler.action(
+  /select_banner_effect_(banner_in_the_haze|luminous_fluid|molten_glass|on_wood|organic)/,
+  async ctx => {
+    await ctx.answerCbQuery();
+    const state = ctx.wizard.state as GenerateWizardState;
+    const selectedBannerEffect = ctx.match[1];
 
-  // Prompt for photo
-  try {
-    await ctx.editMessageText(ctx.i18n.t('bot:generate.send_logo_for_effect'), {
-      parse_mode: 'HTML',
-    });
-  } catch (error) {
-    // If editing fails, send a new message
-    await ctx.reply(ctx.i18n.t('bot:generate.send_logo_for_effect'), {
-      parse_mode: 'HTML',
-    });
+    if (!state?.generationData) {
+      Logger.warn('State missing in banner effect selection', { userId: ctx.from?.id });
+      return exitWithError(ctx, 'bot:errors.general');
+    }
+
+    // Store the selected banner effect
+    state.generationData.bannerEffect = selectedBannerEffect;
+
+    // Prompt for photo
+    try {
+      await ctx.editMessageText(ctx.i18n.t('bot:generate.send_banner_for_effect'), {
+        parse_mode: 'HTML',
+      });
+    } catch (error) {
+      // If editing fails, send a new message
+      await ctx.reply(ctx.i18n.t('bot:generate.send_banner_for_effect'), {
+        parse_mode: 'HTML',
+      });
+    }
+
+    // Move to the photo handler step
+    return ctx.wizard.selectStep(4);
   }
+);
 
-  // Move to the photo handler step
-  return ctx.wizard.selectStep(4);
-});
-
-effectSelectorHandler.action('previous_page', async (ctx) => {
+effectSelectorHandler.action('previous_page', async ctx => {
   await ctx.answerCbQuery();
   const state = ctx.wizard.state as GenerateWizardState;
   if (state.currentPage && state.currentPage > 0) {
@@ -258,10 +350,11 @@ effectSelectorHandler.action('previous_page', async (ctx) => {
   }
 });
 
-effectSelectorHandler.action('next_page', async (ctx) => {
+effectSelectorHandler.action('next_page', async ctx => {
   await ctx.answerCbQuery();
   const state = ctx.wizard.state as GenerateWizardState;
-  if (state.currentPage !== undefined) { // Check if currentPage is defined
+  if (state.currentPage !== undefined) {
+    // Check if currentPage is defined
     const maxPage = Math.ceil(effectOptions.length / effectsPerPage) - 1;
     if (state.currentPage < maxPage) {
       state.currentPage++;
@@ -269,7 +362,6 @@ effectSelectorHandler.action('next_page', async (ctx) => {
     }
   }
 });
-
 
 /**
  * Handles photo/document input from the user.
@@ -287,7 +379,9 @@ async function handlePhotoInput(ctx: MyContext, fileId: string): Promise<void> {
 
   try {
     // Send confirmation and queue the job
-    const statusMessage = await ctx.reply(ctx.i18n.t('bot:generate.processing_queued'), { parse_mode: 'HTML' });
+    const statusMessage = await ctx.reply(ctx.i18n.t('bot:generate.processing_queued'), {
+      parse_mode: 'HTML',
+    });
 
     await queueImageGenerationJob({
       userId,
@@ -298,9 +392,8 @@ async function handlePhotoInput(ctx: MyContext, fileId: string): Promise<void> {
       chatId: ctx.chat?.id.toString() || '',
       messageId: statusMessage.message_id,
       language: language || ctx.i18n.locale || 'en',
-      resolution: resolution
+      resolution: resolution,
     });
-
   } catch (error) {
     Logger.error(error, { context: 'queueImageGenerationJob', userId });
     await ctx.reply(ctx.i18n.t('bot:generate.queue_error'));
@@ -341,25 +434,31 @@ photoHandler.on('message', async ctx => {
 });
 
 // Handle initial options
-initialOptionHandler.action('select_photo_styling', async (ctx) => {
+initialOptionHandler.action('select_photo_styling', async ctx => {
   await ctx.answerCbQuery();
   await showEffectSelection(ctx);
   return ctx.wizard.selectStep(3); // Move to effect selection handler step
 });
 
-initialOptionHandler.action('select_video_effects', async (ctx) => {
+initialOptionHandler.action('select_video_effects', async ctx => {
   await ctx.answerCbQuery();
   // Enter the videoEffect scene with source information
   return ctx.scene.enter('videoEffect', { source: 'generate' });
 });
 
-initialOptionHandler.action('select_logo_styling', async (ctx) => {
+initialOptionHandler.action('select_logo_styling', async ctx => {
   await ctx.answerCbQuery();
   await showLogoEffectSelection(ctx);
   return ctx.wizard.selectStep(2); // Move to logo effect selection handler step
 });
 
-initialOptionHandler.action('cancel_generation', async (ctx) => {
+initialOptionHandler.action('select_banner_styling', async ctx => {
+  await ctx.answerCbQuery();
+  await showBannerEffectSelection(ctx);
+  return ctx.wizard.selectStep(2); // Move to logo effect selection handler step
+});
+
+initialOptionHandler.action('cancel_generation', async ctx => {
   await ctx.answerCbQuery();
   return exitScene(ctx, 'bot:generate.cancelled');
 });
@@ -368,7 +467,7 @@ initialOptionHandler.action('cancel_generation', async (ctx) => {
 export const generateScene = new Scenes.WizardScene<MyContext>(
   'generate',
   // Step 0: Initial check and options selection
-  async (ctx) => {
+  async ctx => {
     const telegramId = ctx.from?.id.toString() || '';
     const initState = await initializeWizardState(ctx, telegramId);
     if (!initState || !initState.userData) {
@@ -379,7 +478,7 @@ export const generateScene = new Scenes.WizardScene<MyContext>(
     if (!canGenerate) {
       return ctx.scene.leave();
     }
-    
+
     await showInitialOptions(ctx);
     return ctx.wizard.next(); // Move to initial options handler step
   },
@@ -398,7 +497,10 @@ async function exitWithError(ctx: MyContext, messageKey: string) {
   try {
     await ctx.reply(ctx.i18n.t(messageKey));
   } catch (replyError) {
-     Logger.warn(`Failed to send error message ${messageKey}`, { userId: ctx.from?.id, error: replyError });
+    Logger.warn(`Failed to send error message ${messageKey}`, {
+      userId: ctx.from?.id,
+      error: replyError,
+    });
   }
   return ctx.scene.leave();
 }

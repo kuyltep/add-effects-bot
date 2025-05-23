@@ -4,8 +4,6 @@ import { addGenerationsToUser } from '../services/payment';
 import { sendPaymentSuccessNotification } from '../services/payment';
 
 export default async function (fastify: FastifyInstance, options: FastifyPluginOptions) {
-
-
   // Payment service webhook for payment notifications
   fastify.post('/webhook', async (request, reply) => {
     try {
@@ -47,18 +45,17 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
         return reply.status(400).send({ error: 'User not found' });
       }
 
-
       // Add generations to user's account
       if (generationsAdded) {
         await addGenerationsToUser(userId, generationsAdded);
-        
+
         // Notify user via Telegram
         sendPaymentSuccessNotification({
           userId,
           telegramId: user.telegramId,
           generationsAdded,
           amount,
-        })
+        });
       }
 
       return reply.send({ success: true });

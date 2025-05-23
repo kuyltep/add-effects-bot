@@ -34,11 +34,11 @@ const getAbsolutePath = (filePath: string): string => {
 };
 
 // Scene enter handler
-upgradeScene.enter(async (ctx) => {
+upgradeScene.enter(async ctx => {
   try {
     const userId = ctx.from.id.toString();
     const user = await ctx.prisma.user.findUnique({
-      where: { telegramId: userId }
+      where: { telegramId: userId },
     });
 
     if (!user) {
@@ -48,17 +48,19 @@ upgradeScene.enter(async (ctx) => {
 
     // Check if user has enough balance
     if (user.remainingGenerations < IMAGE_UPGRADE_COST) {
-      await ctx.reply(ctx.i18n.t('bot:upgrade.insufficient_balance', { 
-        cost: IMAGE_UPGRADE_COST,
-        balance: user.remainingGenerations,
-        parse_mode: 'HTML'
-      }));
+      await ctx.reply(
+        ctx.i18n.t('bot:upgrade.insufficient_balance', {
+          cost: IMAGE_UPGRADE_COST,
+          balance: user.remainingGenerations,
+          parse_mode: 'HTML',
+        })
+      );
       return await exitScene(ctx);
     }
 
     // Get image path from scene state
     const state = ctx.scene.state as UpgradeSceneState;
-    
+
     // Support both imagePath and imagePaths for backward compatibility
     let imagePath = state.imagePath;
     if (!imagePath && state.imagePaths && state.imagePaths.length > 0) {
@@ -67,12 +69,12 @@ upgradeScene.enter(async (ctx) => {
       // Save to state for later use
       state.imagePath = imagePath;
     }
-    
+
     if (!imagePath) {
       await ctx.reply(ctx.i18n.t('bot:upgrade.no_image'));
       return await exitScene(ctx);
     }
-    
+
     // Validate image path
     if (!imagePath.startsWith('http') && !fileExists(getAbsolutePath(imagePath))) {
       await ctx.reply(ctx.i18n.t('bot:upgrade.image_expired'));
@@ -80,17 +82,14 @@ upgradeScene.enter(async (ctx) => {
     }
 
     // Send confirmation message
-    await ctx.replyWithPhoto(
-      imagePath.startsWith('http') ? imagePath : { source: imagePath },
-      {
-        caption: ctx.i18n.t('bot:upgrade.confirm_image', { cost: IMAGE_UPGRADE_COST }),
-        parse_mode: 'HTML',
-        ...Markup.inlineKeyboard([
-          [Markup.button.callback(ctx.i18n.t('bot:upgrade.confirm_button'), 'confirm_upgrade')],
-          [Markup.button.callback(ctx.i18n.t('common.cancel'), 'cancel')]
-        ])
-      }
-    );
+    await ctx.replyWithPhoto(imagePath.startsWith('http') ? imagePath : { source: imagePath }, {
+      caption: ctx.i18n.t('bot:upgrade.confirm_image', { cost: IMAGE_UPGRADE_COST }),
+      parse_mode: 'HTML',
+      ...Markup.inlineKeyboard([
+        [Markup.button.callback(ctx.i18n.t('bot:upgrade.confirm_button'), 'confirm_upgrade')],
+        [Markup.button.callback(ctx.i18n.t('common.cancel'), 'cancel')],
+      ]),
+    });
   } catch (error) {
     console.error('Error in upgrade scene enter:', error);
     await handleSceneError(ctx, error, 'upgrade');
@@ -98,11 +97,11 @@ upgradeScene.enter(async (ctx) => {
 });
 
 // Handle upgrade confirmation
-upgradeScene.action('confirm_upgrade', async (ctx) => {
+upgradeScene.action('confirm_upgrade', async ctx => {
   try {
     await ctx.answerCbQuery();
     const state = ctx.scene.state as UpgradeSceneState;
-    
+
     // Support both imagePath and imagePaths for backward compatibility
     let imagePath = state.imagePath;
     if (!imagePath && state.imagePaths && state.imagePaths.length > 0) {
@@ -111,39 +110,39 @@ upgradeScene.action('confirm_upgrade', async (ctx) => {
       // Save to state for later use
       state.imagePath = imagePath;
     }
-    
+
     // If no image is available, exit
     if (!imagePath) {
       await ctx.reply(ctx.i18n.t('bot:upgrade.image_expired'));
       return await exitScene(ctx);
     }
-    
+
     // Show queued message
     const processingMsg = await ctx.reply(ctx.i18n.t('bot:upgrade.queued'));
-    
+
     // Deduct generations from user balance
     const userId = ctx.from.id.toString();
     const user = await prisma.user.findFirst({
       where: { telegramId: userId },
       select: {
         id: true,
-      }
+      },
     });
-    
+
     try {
       // Create an image upgrade generation record
       const upgradeGeneration = await prisma.generation.create({
         data: {
           userId: user.id,
-          prompt: "Enhance image quality",  // Hardcoded prompt as requested
-          model: "upgrade",                 // Hardcoded model as requested
-          seed: -1,                         // Random seed
-          width: 1024,                      // Default width
-          height: 1024,                     // Default height
-          batchSize: 1,                     // Just one image
-          imageUrls: [],                    // Will be updated when enhancement is ready
-          status: GenerationStatus.PROCESSING
-        }
+          prompt: 'Enhance image quality', // Hardcoded prompt as requested
+          model: 'upgrade', // Hardcoded model as requested
+          seed: -1, // Random seed
+          width: 1024, // Default width
+          height: 1024, // Default height
+          batchSize: 1, // Just one image
+          imageUrls: [], // Will be updated when enhancement is ready
+          status: GenerationStatus.PROCESSING,
+        },
       });
 
       // Get user's preferred language
@@ -156,7 +155,7 @@ upgradeScene.action('confirm_upgrade', async (ctx) => {
         imagePath,
         chatId: ctx.chat.id,
         messageId: processingMsg.message_id,
-        language: userLang
+        language: userLang,
       });
 
       // Notify user that the task is queued
@@ -166,23 +165,22 @@ upgradeScene.action('confirm_upgrade', async (ctx) => {
         undefined,
         ctx.i18n.t('bot:upgrade.processing_queued')
       );
-      
+
       // Exit scene - enhanced image will be sent by the worker when ready
       return await exitScene(ctx);
-      
     } catch (error) {
       console.error('Image upgrade error:', error);
-      
+
       // Refund the user's generations
       await ctx.prisma.user.update({
         where: { id: user.id },
         data: {
           remainingGenerations: {
-            increment: IMAGE_UPGRADE_COST
-          }
-        }
+            increment: IMAGE_UPGRADE_COST,
+          },
+        },
       });
-      
+
       await ctx.reply(ctx.i18n.t('bot:upgrade.upgrade_error'));
       return await exitScene(ctx);
     }
@@ -193,15 +191,15 @@ upgradeScene.action('confirm_upgrade', async (ctx) => {
 });
 
 // Handle cancel button
-upgradeScene.action('cancel', async (ctx) => {
+upgradeScene.action('cancel', async ctx => {
   await ctx.answerCbQuery();
   await ctx.reply(ctx.i18n.t('bot:upgrade.cancelled'));
   return await exitScene(ctx);
 });
 
 // Handle back button
-upgradeScene.action('back', async (ctx) => {
+upgradeScene.action('back', async ctx => {
   await ctx.answerCbQuery();
   await ctx.reply(ctx.i18n.t('bot:upgrade.cancelled'));
   return await exitScene(ctx);
-}); 
+});

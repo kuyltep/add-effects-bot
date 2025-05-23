@@ -15,16 +15,18 @@ import { Logger } from '../utils/rollbar.logger';
  * @returns A promise resolving when transition is complete
  */
 export async function transitionToScene(
-  ctx: MyContext, 
+  ctx: MyContext,
   sceneName: SceneName | SceneType,
   state?: Record<string, any>
 ): Promise<void> {
   try {
     // Answer callback query if exists to prevent hanging UI
     if (ctx.callbackQuery) {
-      await ctx.answerCbQuery().catch(err => Logger.error(err, { context: 'transitionToScene', method: 'answerCbQuery' }));
+      await ctx
+        .answerCbQuery()
+        .catch(err => Logger.error(err, { context: 'transitionToScene', method: 'answerCbQuery' }));
     }
-    
+
     await ctx.scene.leave();
     await ctx.scene.enter(sceneName, state);
   } catch (error) {
@@ -39,7 +41,7 @@ export async function transitionToScene(
  * @param direction Direction to move (next, previous, exit)
  */
 export async function transitionWizardStep(
-  ctx: MyContext, 
+  ctx: MyContext,
   direction: TransitionDirection
 ): Promise<void> {
   try {
@@ -71,7 +73,7 @@ export async function transitionWizardStep(
  * @returns Promise resolving to wizard state or null if initialization failed
  */
 export async function initializeWizardState(
-  ctx: MyContext, 
+  ctx: MyContext,
   telegramId: string
 ): Promise<GenerateWizardState | null> {
   try {
@@ -85,7 +87,7 @@ export async function initializeWizardState(
 
     // Get user settings with a single query
     const settings = await getOrCreateUserSettings(user.id);
-    
+
     // Get dimensions calculated once
     const dimensions = getResolutionDimensions(settings.resolution);
 
@@ -116,16 +118,16 @@ export async function initializeWizardState(
         ...settings,
         model: settings.model || undefined,
       },
-      generationData
+      generationData,
     };
-    
+
     // Update wizard state
     Object.assign(ctx.wizard.state, state);
     return state;
   } catch (error) {
-    Logger.error(error, { 
-      context: 'initializeWizardState', 
-      telegramId 
+    Logger.error(error, {
+      context: 'initializeWizardState',
+      telegramId,
     });
     throw error;
   }
@@ -134,23 +136,20 @@ export async function initializeWizardState(
 /**
  * Exits scene with specified message and resets keyboard
  */
-export async function exitScene(
-  ctx: MyContext, 
-  messageKey?: string
-): Promise<any> {
+export async function exitScene(ctx: MyContext, messageKey?: string): Promise<any> {
   try {
     // Answer callback query if it exists
     if (ctx.callbackQuery) {
-      await ctx.answerCbQuery()
+      await ctx.answerCbQuery();
     }
-    
+
     // If message key is provided, send an exit message
     if (messageKey) {
       await ctx.reply(ctx.i18n.t(messageKey), {
         parse_mode: 'HTML',
       });
     }
-    
+
     // Leave the scene
     return await ctx.scene.leave();
   } catch (error) {
@@ -163,19 +162,16 @@ export async function exitScene(
 /**
  * Checks if the callback query data matches the expected pattern
  */
-export function checkCallbackData(
-  ctx: MyContext,
-  pattern: RegExp
-): RegExpMatchArray | null {
+export function checkCallbackData(ctx: MyContext, pattern: RegExp): RegExpMatchArray | null {
   if (!ctx.callbackQuery) {
     return null;
   }
-  
+
   const data = (ctx.callbackQuery as any).data;
   if (!data) {
     return null;
   }
-  
+
   return data.match(pattern);
 }
 
@@ -186,10 +182,10 @@ export function getStartParameter(ctx: MyContext): string | undefined {
   if (!ctx.message || !('text' in ctx.message)) {
     return undefined;
   }
-  
+
   const messageText = ctx.message.text;
   const match = messageText.match(/^\/start\s+p_([a-zA-Z0-9]+)$/);
-  
+
   return match && match[1] ? match[1].trim() : undefined;
 }
 
@@ -198,22 +194,21 @@ export function getStartParameter(ctx: MyContext): string | undefined {
  */
 export function createReferralLink(botUsername: string, referralCode: string): string {
   return `https://t.me/${botUsername}?start=p_${referralCode}`;
-} 
-
+}
 
 /**
  * Handles error in scene and exits gracefully
  */
 export async function handleSceneError(
-  ctx: MyContext, 
-  error: unknown, 
+  ctx: MyContext,
+  error: unknown,
   sceneName: string
 ): Promise<any> {
-  Logger.error(error instanceof Error ? error : new Error(String(error)), { 
-    context: 'scene-error', 
-    sceneName 
+  Logger.error(error instanceof Error ? error : new Error(String(error)), {
+    context: 'scene-error',
+    sceneName,
   });
-  
+
   await ctx.reply(ctx.i18n.t('bot:errors.general'), {
     parse_mode: 'HTML',
   });

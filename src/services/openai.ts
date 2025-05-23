@@ -1,28 +1,29 @@
-import fs from "fs";
-import { Logger } from "../utils/rollbar.logger";
-import path from "path";
-import { Resolution } from "@prisma/client";
-import { convertToPng, resizeImage } from "./sharp-service";
-import axios from "axios";
-import FormData from "form-data";
-
+import fs from 'fs';
+import { Logger } from '../utils/rollbar.logger';
+import path from 'path';
+import { Resolution } from '@prisma/client';
+import { convertToPng, resizeImage } from './sharp-service';
+import axios from 'axios';
+import FormData from 'form-data';
 
 // Base prompt template for consistent style transfer
-const BASE_PROMPT_TEMPLATE = "Take this (these) generative person(s) and create a new picture in {style} style. Please, preserve and transfer the facial features of the generative character(s) as much as possible into the new style.";
+const BASE_PROMPT_TEMPLATE =
+  'Take this (these) generative person(s) and create a new picture in {style} style. Please, preserve and transfer the facial features of the generative character(s) as much as possible into the new style.';
 
 // Style definitions for each effect
 const STYLE_DEFINITIONS = {
-  "pixar": "pixar studio 3d animation",
-  "ghibli": "ghibli studio anime",
-  "claymation": "Aardman cartoon style",
-  "bratz": "BRATZ style action doll made of soft-touch plastic. The doll should stand in a brown box, in a recess. There should be accessories in the recesses near the doll",
-  "cat": "photorealistic animal(s) - cat(s)",
-  "dog": "photorealistic animal(s) - dog(s)",
-  "sticker": "sticker style",
-  "new_disney": "disney style",
-  "old_disney": "old disney cartoon style",
-  "mitchells": "in The Mitchells vs. the Machines style",
-  "dreamworks": "DreamWorks cartoon style"
+  pixar: 'pixar studio 3d animation',
+  ghibli: 'ghibli studio anime',
+  claymation: 'Aardman cartoon style',
+  bratz:
+    'BRATZ style action doll made of soft-touch plastic. The doll should stand in a brown box, in a recess. There should be accessories in the recesses near the doll',
+  cat: 'photorealistic animal(s) - cat(s)',
+  dog: 'photorealistic animal(s) - dog(s)',
+  sticker: 'sticker style',
+  new_disney: 'disney style',
+  old_disney: 'old disney cartoon style',
+  mitchells: 'in The Mitchells vs. the Machines style',
+  dreamworks: 'DreamWorks cartoon style',
 };
 
 // Generate full prompts from the template
@@ -32,21 +33,33 @@ const prompts = Object.entries(STYLE_DEFINITIONS).reduce((result, [effect, style
 }, {});
 
 // Logo styling prompt template
-const LOGO_PROMPT_TEMPLATE = "Create a stylized logo with the following style properties: {styleProperties}. The input image should be used as the logo basis. Make sure the result maintains recognizability while applying the style.";
+const LOGO_PROMPT_TEMPLATE =
+  'Create a stylized logo with the following style properties: {styleProperties}. The input image should be used as the logo basis. Make sure the result maintains recognizability while applying the style.';
 
-export async function editImageOpenAI(imagePath: string, effect: string, resolution: Resolution = 'SQUARE', logoEffect?: string): Promise<string> {
+export async function editImageOpenAI(
+  imagePath: string,
+  effect: string,
+  resolution: Resolution = 'SQUARE',
+  logoEffect?: string,
+  bannerEffect?: string,
+  description?: string
+): Promise<string> {
   try {
     // Check if file exists
     if (!fs.existsSync(imagePath)) {
       throw new Error(`Image file not found at path: ${imagePath}`);
     }
-    
+
     // Create a proper PNG version of the input image for OpenAI API
     const pngPath = await convertToPng(imagePath);
-    
+
     // If this is a logo effect, use the logo styling prompt
     if (logoEffect) {
       return await editLogoWithEffect(pngPath, logoEffect, resolution);
+    }
+
+    if (bannerEffect) {
+      return await editBannerWithEffect(pngPath, bannerEffect, description, resolution);
     }
 
     // Validate regular effect type
@@ -59,7 +72,12 @@ export async function editImageOpenAI(imagePath: string, effect: string, resolut
     }
 
     // Process with standard effects
-    return await editImageWithQuality(pngPath, prompts[effect] || "Create a cute stylized hero image", 'medium', resolution);
+    return await editImageWithQuality(
+      pngPath,
+      prompts[effect] || 'Create a cute stylized hero image',
+      'medium',
+      resolution
+    );
   } catch (error) {
     Logger.error(`Error in OpenAI image editing: ${error.message}`, {
       effect,
@@ -74,24 +92,27 @@ export async function editImageOpenAI(imagePath: string, effect: string, resolut
 /**
  * Processes logo with the specified effect style
  */
-export async function editLogoWithEffect(imagePath: string, logoEffect: string, resolution: Resolution = 'SQUARE'): Promise<string> {
+export async function editLogoWithEffect(
+  imagePath: string,
+  logoEffect: string,
+  resolution: Resolution = 'SQUARE'
+): Promise<string> {
   try {
     // Load the effect JSON file
     const effectFilePath = path.join(process.cwd(), 'src', 'prompts', `${logoEffect}.json`);
-    
+
     if (!fs.existsSync(effectFilePath)) {
       throw new Error(`Logo effect file not found: ${effectFilePath}`);
     }
-    
+
     // Read and parse the effect JSON
     const effectData = JSON.parse(fs.readFileSync(effectFilePath, 'utf8'));
-    
+
     // Convert the effect properties into a string for the prompt
-    
-    
+
     // Create the prompt with the style properties
     const prompt = LOGO_PROMPT_TEMPLATE.replace('{styleProperties}', JSON.stringify(effectData));
-    
+
     // Process with OpenAI using high quality for logos
     return await editImageWithQuality(imagePath, prompt, 'medium', resolution);
   } catch (error) {
@@ -103,12 +124,49 @@ export async function editLogoWithEffect(imagePath: string, logoEffect: string, 
   }
 }
 
-export async function editImageWithQuality(imagePath: string, prompt: string, quality: 'medium' | 'high' = 'medium', resolution: Resolution = 'SQUARE'): Promise<string> {
+export async function editBannerWithEffect(
+  imagePath: string,
+  bannerEffect: string,
+  description: string = '',
+  resolution: Resolution = 'SQUARE'
+): Promise<string> {
   try {
+    // Load the effect JSON file
+    const effectFilePath = path.join(process.cwd(), 'src', 'prompts', `${bannerEffect}.json`);
 
+    if (!fs.existsSync(effectFilePath)) {
+      throw new Error(`Banner effect file not found: ${effectFilePath}`);
+    }
 
+    // Read and parse the effect JSON
+    const effectData = JSON.parse(fs.readFileSync(effectFilePath, 'utf8'));
+    effectData.description = description;
+
+    // Convert the effect properties into a string for the prompt
+
+    // Create the prompt with the style properties
+    const prompt = LOGO_PROMPT_TEMPLATE.replace('{styleProperties}', JSON.stringify(effectData));
+
+    // Process with OpenAI using high quality for logos
+    return await editImageWithQuality(imagePath, prompt, 'medium', resolution);
+  } catch (error) {
+    Logger.error(`Error in banner effect processing: ${error.message}`, {
+      bannerEffect,
+      imagePath,
+    });
+    throw error;
+  }
+}
+
+export async function editImageWithQuality(
+  imagePath: string,
+  prompt: string,
+  quality: 'medium' | 'high' = 'medium',
+  resolution: Resolution = 'SQUARE'
+): Promise<string> {
+  try {
     const formData = new FormData();
-    formData.append('image', fs.createReadStream(imagePath), {filename:'input.png'});
+    formData.append('image', fs.createReadStream(imagePath), { filename: 'input.png' });
     formData.append('model', process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1');
     formData.append('prompt', prompt);
     formData.append('n', '1');
@@ -116,11 +174,10 @@ export async function editImageWithQuality(imagePath: string, prompt: string, qu
 
     // Log the request
 
-
     const response = await axios.post('https://api.openai.com/v1/images/edits', formData, {
       headers: {
         ...formData.getHeaders(),
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
       },
     });
 
@@ -128,11 +185,13 @@ export async function editImageWithQuality(imagePath: string, prompt: string, qu
       // Extract URL or base64 content
       if (response.data.data[0].url) {
         // If we get a URL, download the image
-        const imageResponse = await axios.get(response.data.data[0].url, { responseType: 'arraybuffer' });
+        const imageResponse = await axios.get(response.data.data[0].url, {
+          responseType: 'arraybuffer',
+        });
         const outputDir = path.dirname(imagePath);
-        const outputPath = path.join(process.cwd(), outputDir, "processed_image.jpg");
+        const outputPath = path.join(process.cwd(), outputDir, 'processed_image.jpg');
         fs.writeFileSync(outputPath, Buffer.from(imageResponse.data));
-        const resultPath = path.join(process.cwd(), outputDir, "effect_image.jpg");
+        const resultPath = path.join(process.cwd(), outputDir, 'effect_image.jpg');
         await resizeImage(outputPath, resolution, resultPath);
         return resultPath;
       } else if (response.data.data[0].b64_json) {
@@ -140,19 +199,22 @@ export async function editImageWithQuality(imagePath: string, prompt: string, qu
         const imageData = response.data.data[0].b64_json;
         const imageBuffer = Buffer.from(imageData, 'base64');
         const outputDir = path.dirname(imagePath);
-        const outputPath = path.join(process.cwd(), outputDir, "processed_image.jpg");
+        const outputPath = path.join(process.cwd(), outputDir, 'processed_image.jpg');
         fs.writeFileSync(outputPath, imageBuffer);
-        const resultPath = path.join(process.cwd(), outputDir, "effect_image.jpg");
+        const resultPath = path.join(process.cwd(), outputDir, 'effect_image.jpg');
         await resizeImage(outputPath, resolution, resultPath);
         return resultPath;
       }
     }
     throw new Error('OpenAI API did not return valid image data');
   } catch (error) {
-    Logger.error(`Error in direct OpenAI API call: ${error.response?.data || error.message || error}`, {
-      imagePath,
-      quality,
-    });
+    Logger.error(
+      `Error in direct OpenAI API call: ${error.response?.data || error.message || error}`,
+      {
+        imagePath,
+        quality,
+      }
+    );
     throw error;
   }
 }

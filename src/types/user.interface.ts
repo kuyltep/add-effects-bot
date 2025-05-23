@@ -68,4 +68,4 @@ export interface UpdateUserData {
   subscriptionActive?: boolean;
   /** Subscription end date */
   subscriptionEndDate?: Date | null;
-} 
+}

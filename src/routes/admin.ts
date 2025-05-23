@@ -4,9 +4,7 @@ import { runAllCleanupTasks, cleanupPayments } from '../services/cleanup';
 import path from 'path';
 import fs from 'fs/promises';
 
-
 export default async function (fastify: FastifyInstance, options: FastifyPluginOptions) {
-
   /**
    * Эндпоинт для авторизации администратора по паролю из переменной окружения ADMIN_PASSWORD
    * @route POST /login
@@ -52,7 +50,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
         const totalGenerations = await prisma.generation.count();
         const totalPayments = await prisma.payment.count();
         const activeSubscriptions = await prisma.user.count({
-          where: { subscriptionActive: true }
+          where: { subscriptionActive: true },
         });
 
         // Get revenue
@@ -151,7 +149,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
           limit = '50',
           search,
           sortBy = 'createdAt',
-          sortDirection = 'desc'
+          sortDirection = 'desc',
         } = request.query as {
           page?: string;
           limit?: string;
@@ -173,13 +171,12 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
                 { telegramUsername: { contains: search } },
                 { telegramId: { contains: search } },
               ],
-
             }
           : {};
 
         // Build the orderBy object
         const orderBy = {
-          [sortBy]: sortDirection
+          [sortBy]: sortDirection,
         };
 
         const users = await prisma.user.findMany({
@@ -193,13 +190,13 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
                 referrals: true,
                 generations: {
                   where: {
-                    status: 'COMPLETED'
-                  }
+                    status: 'COMPLETED',
+                  },
                 },
                 payments: {
                   where: {
-                    status: 'completed'
-                  }
+                    status: 'completed',
+                  },
                 },
               },
             },
@@ -210,7 +207,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
         const totalCount = await prisma.user.count({ where });
 
         // Format users with the stats that the frontend expects
-        const formattedUsers = users.map((user) => ({
+        const formattedUsers = users.map(user => ({
           id: user.id,
           email: user.email,
           telegramId: user.telegramId,
@@ -277,7 +274,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
         // Parse the search to check for status filtering
         let statusFilter;
         let searchText = search as string;
-        
+
         if (search && search.includes('status:')) {
           const statusMatch = search.match(/status:(\w+)/);
           if (statusMatch && statusMatch[1]) {
@@ -288,7 +285,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
 
         // Build the where clause
         const where: any = {};
-        
+
         if (searchText) {
           where.OR = [
             { prompt: { contains: searchText } },
@@ -296,14 +293,14 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
             { userId: { contains: searchText } },
           ];
         }
-        
+
         if (statusFilter) {
           where.status = statusFilter;
         }
 
         // Build the orderBy object
         const orderBy = {
-          [sortBy]: sortDirection
+          [sortBy]: sortDirection,
         };
 
         const generations = await prisma.generation.findMany({
@@ -374,7 +371,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
 
         // Build the orderBy object
         const orderBy = {
-          [sortBy]: sortDirection
+          [sortBy]: sortDirection,
         };
 
         const generations = await prisma.generation.findMany({
@@ -628,21 +625,21 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
       try {
         // Run all cleanup tasks
         await runAllCleanupTasks();
-        
+
         return reply.send({
           success: true,
-          message: 'Cleanup tasks initiated successfully'
+          message: 'Cleanup tasks initiated successfully',
         });
       } catch (error) {
         request.log.error(error);
-        return reply.status(500).send({ 
+        return reply.status(500).send({
           error: 'Failed to run cleanup tasks',
-          message: error instanceof Error ? error.message : String(error)
+          message: error instanceof Error ? error.message : String(error),
         });
       }
     }
   );
-  
+
   // Payment cleanup only (admin only)
   fastify.post(
     '/maintenance/cleanup-payments',
@@ -652,29 +649,29 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
     async (request, reply) => {
       try {
         const { olderThanHours } = request.body as { olderThanHours?: number };
-        
+
         // Convert hours to milliseconds, default to 1 hour if not specified
         const olderThanMs = (olderThanHours || 1) * 3600000;
-        
+
         // Import the cleanupPendingPayments function directly to use custom time
         const { cleanupPendingPayments } = await import('../services/payment');
-        
+
         // Run payment cleanup with custom time parameter
         const count = await cleanupPendingPayments(olderThanMs);
-        
+
         return reply.send({
           success: true,
           message: `Payment cleanup completed successfully. Removed ${count} stale payments.`,
-          data: { 
+          data: {
             removedCount: count,
-            olderThanHours: olderThanHours || 1
-          }
+            olderThanHours: olderThanHours || 1,
+          },
         });
       } catch (error) {
         request.log.error(error);
-        return reply.status(500).send({ 
+        return reply.status(500).send({
           error: 'Failed to run payment cleanup',
-          message: error instanceof Error ? error.message : String(error)
+          message: error instanceof Error ? error.message : String(error),
         });
       }
     }
@@ -769,7 +766,14 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
     },
     async (request, reply) => {
       try {
-        const { page = 1, limit = 10, search = '', sortBy = 'createdAt', sortDirection = 'desc', status } = request.query as {
+        const {
+          page = 1,
+          limit = 10,
+          search = '',
+          sortBy = 'createdAt',
+          sortDirection = 'desc',
+          status,
+        } = request.query as {
           page?: number;
           limit?: number;
           search?: string;
@@ -785,12 +789,12 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
 
         // Prepare filter conditions
         const whereConditions: any = {};
-        
+
         // Add status filter if provided
         if (status && status !== 'all') {
           whereConditions.status = status;
         }
-        
+
         // Add search filter if provided
         if (search) {
           whereConditions.OR = [

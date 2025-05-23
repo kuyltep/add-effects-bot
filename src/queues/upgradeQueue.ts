@@ -67,4 +67,4 @@ export async function getUpgradeJobStatus(jobId: string): Promise<string | null>
   return state;
 }
 
-export default upgradeQueue; 
+export default upgradeQueue;

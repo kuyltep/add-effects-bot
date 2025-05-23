@@ -1,17 +1,16 @@
-import Replicate from "replicate";
+import Replicate from 'replicate';
 import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { publishMessage, publishBatch } from '../utils/redis';
 import { prisma } from '../utils/prisma';
 import { GenerationStatus } from '@prisma/client';
-import path from "path";
-import { generateVideoWithFalEffect } from "./fal-ai";
+import path from 'path';
+import { generateVideoWithFalEffect } from './fal-ai';
 
-export const replicate = new Replicate({auth: process.env.REPLICATE_API_TOKEN});
+export const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN });
 
 // Base API URL for webhook callbacks
 const API_BASE_URL = process.env.API_BASE_URL;
-
 
 /**
  * Enhance image quality using Aura SR model
@@ -23,23 +22,23 @@ export async function enhanceImage(imagePath: string): Promise<string> {
     // Read image as base64
     let imageData;
     if (imagePath.startsWith('https://')) {
-      imageData = imagePath
-    }else{
-    const imageBuffer = fs.readFileSync(imagePath);
-    const base64Image = imageBuffer.toString('base64');
-    imageData = `data:application/octet-stream;base64,${base64Image}`
+      imageData = imagePath;
+    } else {
+      const imageBuffer = fs.readFileSync(imagePath);
+      const base64Image = imageBuffer.toString('base64');
+      imageData = `data:application/octet-stream;base64,${base64Image}`;
     }
 
     // Call Replicate API to enhance image
     const output = await replicate.run(
-      "zsxkib/aura-sr-v2:5c137257cce8d5ce16e8a334b70e9e025106b5580affed0bc7d48940b594e74c",
+      'zsxkib/aura-sr-v2:5c137257cce8d5ce16e8a334b70e9e025106b5580affed0bc7d48940b594e74c',
       {
         input: {
           image: imageData,
           output_format: 'png',
           max_batch_size: 32,
           output_quality: 100,
-        }
+        },
       }
     );
     // Return the enhanced image URL directly
@@ -62,10 +61,19 @@ export async function enhanceImage(imagePath: string): Promise<string> {
  * @returns Prediction ID from Replicate
  */
 
-async function generateVideoWithMoveEffect(imagePathOrUrl: string, prompt: string, generationId: string, chatId: number, userId: string, messageId: number, language: string = 'en', effect: string = 'animation', source?: string): Promise<string> {
+async function generateVideoWithMoveEffect(
+  imagePathOrUrl: string,
+  prompt: string,
+  generationId: string,
+  chatId: number,
+  userId: string,
+  messageId: number,
+  language: string = 'en',
+  effect: string = 'animation',
+  source?: string
+): Promise<string> {
   let imageBase64;
-  
-  
+
   if (imagePathOrUrl.startsWith('http')) {
     // It's a URL, we'll pass it directly to the model
     // First download the image to convert to base64
@@ -80,33 +88,32 @@ async function generateVideoWithMoveEffect(imagePathOrUrl: string, prompt: strin
     const imageBuffer = fs.readFileSync(imagePathOrUrl);
     imageBase64 = imageBuffer.toString('base64');
   }
-  
+
   // Create unique webhook ID
   const webhookId = uuidv4();
-  
+
   const webhookUrl = `${API_BASE_URL}/api/generation/video-webhook/${webhookId}?generationId=${generationId}&chatId=${chatId}&userId=${userId}&messageId=${messageId}&language=${language}&effect=${effect}&source=${source}`;
-  
+
   const prediction = await replicate.predictions.create({
-    version: "minimax/video-01-live",
+    version: 'minimax/video-01-live',
     input: {
       first_frame_image: `data:application/octet-stream;base64,${imageBase64}`,
       prompt: prompt,
       prompt_optimizer: false,
     },
     webhook: webhookUrl,
-    webhook_events_filter: ["completed"]
+    webhook_events_filter: ['completed'],
   });
 
-  setTimeout(async () => {console.log(JSON.stringify(await getPredictionStatus(prediction.id)))
+  setTimeout(async () => {
+    console.log(JSON.stringify(await getPredictionStatus(prediction.id)));
   }, 60000);
   // Return the prediction ID
   return prediction.id;
 }
 
-
-
 export async function generateVideoFromImage(
-  imagePathOrUrl: string, 
+  imagePathOrUrl: string,
   prompt: string,
   generationId: string,
   chatId: number,
@@ -118,30 +125,32 @@ export async function generateVideoFromImage(
 ): Promise<string> {
   try {
     // Determine which generation function to use based on effect type
-    const {videoConfig: {falEffects}} = await import('../config');
-    
+    const {
+      videoConfig: { falEffects },
+    } = await import('../config');
+
     if (falEffects.includes(effect)) {
       return await generateVideoWithFalEffect(
-        imagePathOrUrl, 
-        prompt, 
-        generationId, 
-        chatId, 
-        userId, 
-        messageId, 
-        language, 
+        imagePathOrUrl,
+        prompt,
+        generationId,
+        chatId,
+        userId,
+        messageId,
+        language,
         effect,
         source
       );
     } else {
       // Default to animation/claymation/etc effects via Replicate
       return await generateVideoWithMoveEffect(
-        imagePathOrUrl, 
-        prompt, 
-        generationId, 
-        chatId, 
-        userId, 
-        messageId, 
-        language, 
+        imagePathOrUrl,
+        prompt,
+        generationId,
+        chatId,
+        userId,
+        messageId,
+        language,
         effect,
         source
       );
@@ -157,13 +166,15 @@ export async function generateVideoFromImage(
  * @param predictionId Prediction ID from Replicate
  * @returns Prediction status and output if available
  */
-export async function getPredictionStatus(predictionId: string): Promise<{ status: string, output?: string }> {
+export async function getPredictionStatus(
+  predictionId: string
+): Promise<{ status: string; output?: string }> {
   try {
     const prediction = await replicate.predictions.get(predictionId);
-    
+
     return {
       status: prediction.status,
-      output: prediction.output ? prediction.output[0] : undefined
+      output: prediction.output ? prediction.output[0] : undefined,
     };
   } catch (error) {
     console.error('Error getting prediction status:', error);
@@ -192,47 +203,47 @@ export async function processCompletedVideo(
     // Get user information from the generation record
     const generation = await prisma.generation.findUnique({
       where: { id: generationId },
-      select: { userId: true }
+      select: { userId: true },
     });
-    
+
     if (!generation) {
       console.error(`Generation ${generationId} not found`);
       return;
     }
-    
+
     // Get the user information including referral code
     const user = await prisma.user.findUnique({
       where: { id: generation.userId },
-      select: { remainingGenerations: true, referralCode: true }
+      select: { remainingGenerations: true, referralCode: true },
     });
-    
+
     if (!user) {
       console.error(`User for generation ${generationId} not found`);
       return;
     }
-    
+
     // Update generation record
     await prisma.generation.update({
       where: { id: generationId },
       data: {
         status: GenerationStatus.COMPLETED,
-        imageUrls: [videoUrl]
-      }
+        imageUrls: [videoUrl],
+      },
     });
-    
+
     // Get completion message with watermark from translation
-    const completionMessage = language === 'ru' 
-      ? '🎬 Ваше видео готово!' 
-      : '🎬 Your video is ready!';
-    
+    const completionMessage =
+      language === 'ru' ? '🎬 Ваше видео готово!' : '🎬 Your video is ready!';
+
     // Get watermark text from translations
-    const watermarkText = language === 'ru'
-      ? `<a href='https://t.me/${process.env.BOT_USERNAME}?start=p_${user.referralCode}'>Сгенерировано в Avato Effects Bot 📸</a>\n\nСоздано при поддержке <a href='https://t.me/avato_ai'>Avato AI 📸</a>`
-      : `<a href='https://t.me/${process.env.BOT_USERNAME}?start=p_${user.referralCode}'>Created with Avato Effects Bot 📸</a>\n\nSupported by <a href='https://t.me/avato_ai'>Avato AI 📸</a>`;
-    
+    const watermarkText =
+      language === 'ru'
+        ? `<a href='https://t.me/${process.env.BOT_USERNAME}?start=p_${user.referralCode}'>Сгенерировано в Avato Effects Bot 📸</a>\n\nСоздано при поддержке <a href='https://t.me/avato_ai'>Avato AI 📸</a>`
+        : `<a href='https://t.me/${process.env.BOT_USERNAME}?start=p_${user.referralCode}'>Created with Avato Effects Bot 📸</a>\n\nSupported by <a href='https://t.me/avato_ai'>Avato AI 📸</a>`;
+
     // Caption for video combining completion message and watermark
     const videoCaption = `${completionMessage}\n\n${watermarkText}`;
-    
+
     // Send status update and video via one batch
     await publishBatch([
       {
@@ -241,8 +252,8 @@ export async function processCompletedVideo(
           chatId,
           messageId,
           text: completionMessage,
-          parseMode: 'HTML'
-        })
+          parseMode: 'HTML',
+        }),
       },
       {
         channel: 'bot:send_video',
@@ -254,53 +265,59 @@ export async function processCompletedVideo(
           language,
           userId: generation.userId,
           remainingGenerations: user.remainingGenerations,
-          source: source || 'command' // Pass along the source
-        })
-      }
+          source: source || 'command', // Pass along the source
+        }),
+      },
     ]);
-    
+
     console.log(`Video sent to chat ${chatId}`);
   } catch (error) {
     console.error('Error processing completed video:', error);
-    
+
     // Try to notify user of error
-    await publishMessage('bot:send_message', JSON.stringify({
-      chatId,
-      text: language === 'ru' 
-        ? '❌ Ошибка при обработке видео. Пожалуйста, попробуйте позже.'
-        : '❌ Error processing video. Please try again later.',
-      parseMode: 'HTML'
-    }));
+    await publishMessage(
+      'bot:send_message',
+      JSON.stringify({
+        chatId,
+        text:
+          language === 'ru'
+            ? '❌ Ошибка при обработке видео. Пожалуйста, попробуйте позже.'
+            : '❌ Error processing video. Please try again later.',
+        parseMode: 'HTML',
+      })
+    );
   }
 }
 
 export function getMimeType(filePath: string) {
   const extension = path.extname(filePath).toLowerCase();
   switch (extension) {
-    case ".jpg":
-    case ".jpeg":
-      return "image/jpeg";
-    case ".png":
-      return "image/png";
-    case ".gif":
-      return "image/gif";
-    case ".webp":
-      return "image/webp";
+    case '.jpg':
+    case '.jpeg':
+      return 'image/jpeg';
+    case '.png':
+      return 'image/png';
+    case '.gif':
+      return 'image/gif';
+    case '.webp':
+      return 'image/webp';
     default:
-      return "application/octet-stream"; // По умолчанию
+      return 'application/octet-stream'; // По умолчанию
   }
 }
 
-async function checkPrediction(predictionId: string, interval: number = 30000, maxAttempts: number = 5) {
+async function checkPrediction(
+  predictionId: string,
+  interval: number = 30000,
+  maxAttempts: number = 5
+) {
   for (let i = 0; i < maxAttempts; i++) {
-  const latest = await replicate.predictions.get(predictionId);
-  console.log(latest);
-    if (latest.status !== "starting" && latest.status !== "processing") {
+    const latest = await replicate.predictions.get(predictionId);
+    console.log(latest);
+    if (latest.status !== 'starting' && latest.status !== 'processing') {
       return latest;
     }
     // Wait for 2 seconds and then try again.
-    await new Promise((resolve) => setTimeout(resolve, interval));
+    await new Promise(resolve => setTimeout(resolve, interval));
   }
 }
-
-

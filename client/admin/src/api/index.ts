@@ -26,6 +26,8 @@ const api = axios.create({
   },
 });
 
+api.defaults.headers.common['ngrok-skip-browser-warning'] = "false"; 
+
 // Интерцептор для добавления токена аутентификации
 api.interceptors.request.use(config => {
   const authStore = useAuthStore();
