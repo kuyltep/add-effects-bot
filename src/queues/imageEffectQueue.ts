@@ -8,7 +8,7 @@ import { createRedisConnection } from '../utils/redis';
 export interface ImageEffectJobData {
   generationId: string;
   userId: string;
-  fileId: string;
+  fileId?: string;
   effect?: EffectType;
   logoEffect?: string;
   bannerEffect?: string;

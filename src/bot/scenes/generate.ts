@@ -1,6 +1,10 @@
 import { Composer, Context, Markup, Scenes } from 'telegraf';
 import { MyContext, GenerateWizardState, EffectType } from '../../types';
-import { canUserGenerate, queueImageGenerationJob } from '../../services/generation';
+import {
+  canUserGenerate,
+  queueImageFromTextGenerationJob,
+  queueImageGenerationJob,
+} from '../../services/generation';
 import { initializeWizardState, exitScene } from '../../services/scene';
 import { Logger } from '../../utils/rollbar.logger';
 
@@ -10,6 +14,7 @@ const effectSelectorHandler = new Composer<MyContext>();
 const logoEffectSelectorHandler = new Composer<MyContext>();
 const bannerEffectSelectorHandler = new Composer<MyContext>();
 const photoHandler = new Composer<MyContext>();
+const photoAndTextHandler = new Composer<MyContext>();
 
 const effectsPerPage = 8;
 
@@ -45,10 +50,10 @@ const logoEffectOptions = [
 const bannerEffectOptions = [
   'banner_without_effects',
   'banner_in_the_haze',
-  'luminous_fluid',
-  'molten_glass',
-  'on_wood',
-  'organic',
+  'banner_luminous_fluid',
+  'banner_molten_glass',
+  'banner_on_wood',
+  'banner_organic',
 ];
 
 // WIZARD STEP TRANSITIONS & HANDLERS
@@ -191,15 +196,15 @@ async function showBannerEffectSelection(ctx: MyContext): Promise<void> {
     banner_without_effects: ctx.i18n.t('bot:generate.banner_effect_without_effects'),
 
     banner_in_the_haze: ctx.i18n.t('bot:generate.banner_effect_banner_in_the_haze'),
-    luminous_fluid: ctx.i18n.t('bot:generate.banner_effect_luminous_fluid'),
-    molten_glass: ctx.i18n.t('bot:generate.banner_effect_molten_glass'),
-    on_wood: ctx.i18n.t('bot:generate.banner_effect_on_wood'),
-    organic: ctx.i18n.t('bot:generate.banner_effect_organic'),
+    banner_luminous_fluid: ctx.i18n.t('bot:generate.banner_effect_luminous_fluid'),
+    banner_molten_glass: ctx.i18n.t('bot:generate.banner_effect_molten_glass'),
+    banner_on_wood: ctx.i18n.t('bot:generate.banner_effect_on_wood'),
+    banner_organic: ctx.i18n.t('bot:generate.banner_effect_organic'),
   };
 
   // Create buttons for each banner effect
   const effectButtons = bannerEffectOptions.map(effect =>
-    Markup.button.callback(effectLabels[effect], `select_logo_effect_${effect}`)
+    Markup.button.callback(effectLabels[effect], `select_banner_effect_${effect}`)
   );
 
   // Arrange buttons
@@ -310,7 +315,7 @@ logoEffectSelectorHandler.action(
  * Handles the selection of a banner effect.
  */
 bannerEffectSelectorHandler.action(
-  /select_banner_effect_(banner_in_the_haze|luminous_fluid|molten_glass|on_wood|organic)/,
+  /select_banner_effect_(banner_without_effects|banner_in_the_haze|banner_luminous_fluid|banner_molten_glass|banner_on_wood|banner_organic)/,
   async ctx => {
     await ctx.answerCbQuery();
     const state = ctx.wizard.state as GenerateWizardState;
@@ -336,8 +341,8 @@ bannerEffectSelectorHandler.action(
       });
     }
 
-    // Move to the photo handler step
-    return ctx.wizard.selectStep(4);
+    // Move to the photo + text handler step
+    return ctx.wizard.selectStep(6);
   }
 );
 
@@ -373,7 +378,7 @@ async function handlePhotoInput(ctx: MyContext, fileId: string): Promise<void> {
     return exitWithError(ctx, 'bot:errors.general');
   }
 
-  const { effect, logoEffect } = state.generationData;
+  const { effect, logoEffect, bannerEffect, description } = state.generationData;
   const { id: userId, language } = state.userData;
   const { resolution } = state.userSettings;
 
@@ -389,10 +394,48 @@ async function handlePhotoInput(ctx: MyContext, fileId: string): Promise<void> {
       fileId: fileId, // Pass file ID from Telegram
       effect,
       logoEffect, // Pass the logo effect if it exists
+      bannerEffect,
+      description,
       chatId: ctx.chat?.id.toString() || '',
       messageId: statusMessage.message_id,
       language: language || ctx.i18n.locale || 'en',
       resolution: resolution,
+    });
+  } catch (error) {
+    Logger.error(error, { context: 'queueImageGenerationJob', userId });
+    await ctx.reply(ctx.i18n.t('bot:generate.queue_error'));
+  }
+
+  // Leave the scene after queuing
+  await ctx.scene.leave();
+}
+
+async function handleTextInput(ctx: MyContext): Promise<void> {
+  const state = ctx.wizard.state as GenerateWizardState;
+  if (!state?.generationData || !state?.userData?.id || !state?.userSettings?.resolution) {
+    Logger.warn('State missing in photoAndText handler', { userId: ctx.from?.id });
+    return exitWithError(ctx, 'bot:errors.general');
+  }
+
+  const { effect, logoEffect, bannerEffect, description } = state.generationData;
+  const { id: userId, language } = state.userData;
+
+  try {
+    // Send confirmation and queue the job
+    const statusMessage = await ctx.reply(ctx.i18n.t('bot:generate.processing_queued'), {
+      parse_mode: 'HTML',
+    });
+
+    await queueImageFromTextGenerationJob({
+      userId,
+      generationId: '', // Will be generated in the service
+      effect,
+      logoEffect, // Pass the logo effect if it exists
+      bannerEffect,
+      description,
+      chatId: ctx.chat?.id.toString() || '',
+      messageId: statusMessage.message_id,
+      language: language || ctx.i18n.locale || 'en',
     });
   } catch (error) {
     Logger.error(error, { context: 'queueImageGenerationJob', userId });
@@ -433,6 +476,48 @@ photoHandler.on('message', async ctx => {
   await ctx.reply(ctx.i18n.t('bot:generate.send_photo_for_effect'));
 });
 
+// Handle photo messages
+photoAndTextHandler.on('photo', async ctx => {
+  const photoSizes = ctx.message.photo;
+  const largestPhoto = photoSizes[photoSizes.length - 1];
+  ctx.session.fileId = largestPhoto.file_id;
+  await ctx.reply(ctx.i18n.t('bot:generate.banner_wait_for_description'));
+});
+
+// Handle document messages
+photoAndTextHandler.on('document', async ctx => {
+  const { document } = ctx.message;
+  if (!document.mime_type?.startsWith('image/')) {
+    await ctx.reply(ctx.i18n.t('bot:generate.not_an_image'));
+    return; // Stay in this step
+  }
+  ctx.session.fileId = document.file_id;
+  await ctx.reply(ctx.i18n.t('bot:generate.banner_wait_for_description'));
+});
+
+// Handle text messages
+photoAndTextHandler.on('text', async ctx => {
+  if (ctx.message.text === '/cancel') {
+    return exitScene(ctx, 'bot:generate.cancelled');
+  }
+  const state = ctx.wizard.state as GenerateWizardState;
+  state.generationData.description = ctx.message.text;
+
+  if (ctx.session.fileId) {
+    // Clear image buffer even error occurs
+    const tempFileId = ctx.session.fileId;
+    ctx.session.fileId = undefined;
+    await handlePhotoInput(ctx, tempFileId);
+  } else {
+    await handleTextInput(ctx);
+  }
+});
+
+// Handle all other message types in photo step
+photoHandler.on('message', async ctx => {
+  await ctx.reply(ctx.i18n.t('bot:generate.banner_wait_for_description'));
+});
+
 // Handle initial options
 initialOptionHandler.action('select_photo_styling', async ctx => {
   await ctx.answerCbQuery();
@@ -455,7 +540,7 @@ initialOptionHandler.action('select_logo_styling', async ctx => {
 initialOptionHandler.action('select_banner_styling', async ctx => {
   await ctx.answerCbQuery();
   await showBannerEffectSelection(ctx);
-  return ctx.wizard.selectStep(2); // Move to logo effect selection handler step
+  return ctx.wizard.selectStep(5); // Move to banner effect selection handler step
 });
 
 initialOptionHandler.action('cancel_generation', async ctx => {
@@ -489,7 +574,11 @@ export const generateScene = new Scenes.WizardScene<MyContext>(
   // Step 3: Handle effect selection callback
   effectSelectorHandler,
   // Step 4: Handle photo input
-  photoHandler
+  photoHandler,
+  // Step 5: Handle banner effect selection
+  bannerEffectSelectorHandler,
+  // Step 6: Handle photo + text input
+  photoAndTextHandler
 );
 
 // Generic error handler for the scene

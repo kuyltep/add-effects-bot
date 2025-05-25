@@ -36,6 +36,54 @@ const prompts = Object.entries(STYLE_DEFINITIONS).reduce((result, [effect, style
 const LOGO_PROMPT_TEMPLATE =
   'Create a stylized logo with the following style properties: {styleProperties}. The input image should be used as the logo basis. Make sure the result maintains recognizability while applying the style.';
 
+// Banner styling prompt template
+const BANNER_PROMPT_TEMPLATE =
+  'Create a stylized banner with the following style properties: {styleProperties}. The input image should be used as the banner basis. Make sure the result maintains recognizability while applying the style.';
+
+// Banner creating image prompt template
+const BANNER_PROMPT_TEMPLATE_WITHOUT_PHOTO =
+  'Create a stylized banner with the following style properties: {styleProperties}. The input description should be used as the banner basis.';
+
+export async function createImageOpenAI(
+  outputDir: string,
+  effect: string,
+  resolution: Resolution = 'SQUARE',
+  logoEffect?: string,
+  bannerEffect?: string,
+  description?: string
+): Promise<string> {
+  try {
+    if (bannerEffect) {
+      return await createBannerWithEffect(outputDir, bannerEffect, description, resolution);
+    }
+
+    // Validate regular effect type
+    if (!effect) {
+      throw new Error('No effect specified and no logo effect provided');
+    }
+
+    if (!prompts[effect]) {
+      Logger.warn(`Unknown effect type: ${effect}, using default prompt`);
+    }
+
+    // Process with standard effects
+    return await createImageWithQuality(
+      outputDir,
+      prompts[effect] || 'Create a cute stylized hero image',
+      'medium',
+      resolution
+    );
+  } catch (error) {
+    Logger.error(`Error in OpenAI image creating: ${error.message}`, {
+      effect,
+      resolution,
+      logoEffect,
+      bannerEffect,
+    });
+    throw error;
+  }
+}
+
 export async function editImageOpenAI(
   imagePath: string,
   effect: string,
@@ -145,7 +193,7 @@ export async function editBannerWithEffect(
     // Convert the effect properties into a string for the prompt
 
     // Create the prompt with the style properties
-    const prompt = LOGO_PROMPT_TEMPLATE.replace('{styleProperties}', JSON.stringify(effectData));
+    const prompt = BANNER_PROMPT_TEMPLATE.replace('{styleProperties}', JSON.stringify(effectData));
 
     // Process with OpenAI using high quality for logos
     return await editImageWithQuality(imagePath, prompt, 'medium', resolution);
@@ -154,6 +202,103 @@ export async function editBannerWithEffect(
       bannerEffect,
       imagePath,
     });
+    throw error;
+  }
+}
+
+export async function createBannerWithEffect(
+  outputDir: string,
+  bannerEffect: string,
+  description: string = '',
+  resolution: Resolution = 'SQUARE'
+): Promise<string> {
+  try {
+    // Load the effect JSON file
+    const effectFilePath = path.join(process.cwd(), 'src', 'prompts', `${bannerEffect}.json`);
+
+    if (!fs.existsSync(effectFilePath)) {
+      throw new Error(`Banner effect file not found: ${effectFilePath}`);
+    }
+
+    // Read and parse the effect JSON
+    const effectData = JSON.parse(fs.readFileSync(effectFilePath, 'utf8'));
+    effectData.description = description;
+
+    // Convert the effect properties into a string for the prompt
+
+    // Create the prompt with the style properties
+    const prompt = BANNER_PROMPT_TEMPLATE_WITHOUT_PHOTO.replace(
+      '{styleProperties}',
+      JSON.stringify(effectData)
+    );
+
+    // Process with OpenAI using high quality for banners
+    return await createImageWithQuality(outputDir, prompt, 'medium', resolution);
+  } catch (error) {
+    Logger.error(`Error in banner effect processing(banner creating): ${error.message}`, {
+      bannerEffect,
+      outputDir,
+    });
+    throw error;
+  }
+}
+
+export async function createImageWithQuality(
+  outputDir: string,
+  prompt: string,
+  quality: 'medium' | 'high' = 'medium',
+  resolution: Resolution = 'SQUARE'
+): Promise<string> {
+  try {
+    // Log the request
+
+    const response = await axios.post(
+      'https://api.openai.com/v1/images/generations',
+      {
+        model: process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1',
+        prompt: prompt,
+        n: 1,
+        quality: quality,
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        },
+      }
+    );
+
+    if (response.data && response.data.data && response.data.data.length > 0) {
+      // Extract URL or base64 content
+      if (response.data.data[0].url) {
+        // If we get a URL, download the image
+        const imageResponse = await axios.get(response.data.data[0].url, {
+          responseType: 'arraybuffer',
+        });
+        const outputPath = path.join(process.cwd(), outputDir, 'processed_image.jpg');
+        fs.writeFileSync(outputPath, Buffer.from(imageResponse.data));
+        const resultPath = path.join(process.cwd(), outputDir, 'effect_image.jpg');
+        await resizeImage(outputPath, resolution, resultPath);
+        return resultPath;
+      } else if (response.data.data[0].b64_json) {
+        // Handle base64 response
+        const imageData = response.data.data[0].b64_json;
+        const imageBuffer = Buffer.from(imageData, 'base64');
+        const outputPath = path.join(process.cwd(), outputDir, 'processed_image.jpg');
+        fs.writeFileSync(outputPath, imageBuffer);
+        const resultPath = path.join(process.cwd(), outputDir, 'effect_image.jpg');
+        await resizeImage(outputPath, resolution, resultPath);
+        return resultPath;
+      }
+    }
+    throw new Error('OpenAI API did not return valid image data');
+  } catch (error) {
+    Logger.error(
+      `Error in direct OpenAI API call: ${error.response?.data || error.message || error}`,
+      {
+        quality,
+      }
+    );
     throw error;
   }
 }

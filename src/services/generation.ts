@@ -133,6 +133,50 @@ export async function queueImageGenerationJob(
 }
 
 /**
+ * Queues a new image from text generation job.
+ *
+ * @param data - Data required for the text based image generation
+ * @returns The job instance
+ */
+export async function queueImageFromTextGenerationJob(
+  data: Omit<ImageEffectJobData, 'generationId'> & { generationId?: string }
+) {
+  try {
+    // Generate a new ID if not provided
+    const generationId = data.generationId || uuidv4();
+
+    // Create a generation record
+    await prisma.generation.create({
+      data: {
+        id: generationId,
+        userId: data.userId,
+        prompt: `Effect: ${data.effect}`, // Use effect name as prompt
+        seed: Math.floor(Math.random() * 2147483647), // Random seed
+        status: GenerationStatus.PENDING,
+        chatId: data.chatId,
+        messageId: data.messageId,
+      },
+    });
+
+    // Queue the job
+    const jobData: ImageEffectJobData = {
+      ...data,
+      generationId,
+    };
+
+    const job = await addImageEffectJob(jobData);
+    return job;
+  } catch (error) {
+    Logger.error(`Error queueing image effect job: ${error.message}`, {
+      userId: data.userId,
+      fileId: data.fileId,
+      effect: data.effect,
+    });
+    throw error;
+  }
+}
+
+/**
  * Checks if a user can generate images.
  * Returns false if not enough generations, not enough time passed, etc.
  *

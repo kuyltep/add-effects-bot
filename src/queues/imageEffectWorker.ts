@@ -10,7 +10,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { createRedisConnection, createRedisPublisher } from '../utils/redis';
 import { applyImageEffect } from '../services/fal-ai';
 import { isMainThread, parentPort, workerData } from 'worker_threads';
-import { editImageOpenAI } from '../services/openai';
+import { createImageOpenAI, editImageOpenAI } from '../services/openai';
 
 // Constants
 const QUEUE_NAME = 'image-effect-generation';
@@ -137,6 +137,8 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
     language,
     resolution = 'SQUARE',
     logoEffect,
+    description,
+    bannerEffect,
   } = job.data;
 
   let localFilePath: string | null = null;
@@ -161,8 +163,12 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
       })
     );
 
-    // 2. Download the original image from Telegram via bot core
-    localFilePath = await downloadTelegramFile(fileId);
+    // 2. Download the original image from Telegram via bot core or create
+    if (fileId) {
+      localFilePath = await downloadTelegramFile(fileId);
+    } else {
+      localFilePath = path.join(UPLOAD_DIR, 'temp');
+    }
 
     // 3. Apply effect based on type
     await redisPublisher.publish(
@@ -170,11 +176,23 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
       JSON.stringify({
         chatId,
         messageId,
-        text: getMessage('applying_effect', language, { effect: effect || logoEffect }),
+        text: getMessage('applying_effect', language, {
+          effect: effect || logoEffect || bannerEffect,
+        }),
       })
     );
 
-    if (FAL_AI_EFFECTS.includes(effect)) {
+    // Generate image with OpenAI service
+    if (!fileId) {
+      finalOutputPath = await createImageOpenAI(
+        localFilePath,
+        effect,
+        resolution as Resolution,
+        logoEffect,
+        bannerEffect,
+        description
+      );
+    } else if (FAL_AI_EFFECTS.includes(effect)) {
       // Process with FAL AI
       finalOutputPath = await applyImageEffect(localFilePath, effect, resolution as Resolution);
     } else if (OPENAI_EFFECTS.includes(effect)) {
@@ -192,6 +210,14 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
         null,
         resolution as Resolution,
         job.data.logoEffect
+      );
+    } else if (job.data.bannerEffect) {
+      // Process logo effects
+      finalOutputPath = await editImageOpenAI(
+        localFilePath,
+        null,
+        resolution as Resolution,
+        job.data.bannerEffect
       );
     } else {
       throw new Error(`Unsupported effect type: ${effect}`);
@@ -276,7 +302,7 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
   } finally {
     try {
       // Clean up temporary downloaded file
-      if (localFilePath) {
+      if (localFilePath && fileId) {
         await fs
           .unlink(localFilePath)
           .catch(unlinkErr =>
