@@ -53,6 +53,8 @@ export async function createImageOpenAI(
   description?: string
 ): Promise<string> {
   try {
+    await fs.promises.mkdir(outputDir, { recursive: true });
+
     if (bannerEffect) {
       return await createBannerWithEffect(outputDir, bannerEffect, description, resolution);
     }

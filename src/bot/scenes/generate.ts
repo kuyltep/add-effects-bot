@@ -514,7 +514,7 @@ photoAndTextHandler.on('text', async ctx => {
 });
 
 // Handle all other message types in photo step
-photoHandler.on('message', async ctx => {
+photoAndTextHandler.on('message', async ctx => {
   await ctx.reply(ctx.i18n.t('bot:generate.banner_wait_for_description'));
 });
 
@@ -580,6 +580,11 @@ export const generateScene = new Scenes.WizardScene<MyContext>(
   // Step 6: Handle photo + text input
   photoAndTextHandler
 );
+
+// Clear photo buffer between entering scene
+generateScene.enter(async ctx => {
+  ctx.session.fileId = undefined;
+});
 
 // Generic error handler for the scene
 async function exitWithError(ctx: MyContext, messageKey: string) {

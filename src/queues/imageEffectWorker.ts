@@ -217,7 +217,9 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
         localFilePath,
         null,
         resolution as Resolution,
-        job.data.bannerEffect
+        undefined,
+        job.data.bannerEffect,
+        description
       );
     } else {
       throw new Error(`Unsupported effect type: ${effect}`);

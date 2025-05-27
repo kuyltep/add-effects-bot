@@ -52,8 +52,8 @@ upgradeScene.enter(async ctx => {
         ctx.i18n.t('bot:upgrade.insufficient_balance', {
           cost: IMAGE_UPGRADE_COST,
           balance: user.remainingGenerations,
-          parse_mode: 'HTML',
-        })
+        }),
+        { parse_mode: 'HTML' }
       );
       return await exitScene(ctx);
     }
