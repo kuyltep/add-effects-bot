@@ -14,13 +14,13 @@ async function displayHelpInfo(ctx: MyContext): Promise<any> {
     parse_mode: 'HTML',
     reply_markup: getMainKeyboard(ctx.i18n.locale || 'en').reply_markup,
   });
-  
+
   // Auto leave the scene after displaying help info
   return ctx.scene.leave();
 }
 
 // Scene enter handler
-helpScene.enter(async (ctx) => {
+helpScene.enter(async ctx => {
   try {
     return await displayHelpInfo(ctx);
   } catch (error) {
@@ -29,6 +29,6 @@ helpScene.enter(async (ctx) => {
 });
 
 // Handle /cancel command
-helpScene.command('cancel', async (ctx) => {
+helpScene.command('cancel', async ctx => {
   return exitScene(ctx, 'bot:errors.cancelled');
-}); 
+});

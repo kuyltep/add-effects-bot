@@ -32,7 +32,7 @@ export async function createUser(
 
   try {
     // Create the user and settings in a transaction to ensure both are created
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async tx => {
       // Create the new user
       const newUser = await tx.user.create({
         data: {
@@ -57,7 +57,7 @@ export async function createUser(
           model: 'rev3',
           // Handle language by casting to any to avoid type issues
           // The schema supports this field, but TypeScript definitions may be outdated
-          language: language ,
+          language: language,
         },
       });
 
@@ -81,7 +81,7 @@ export async function createUser(
             where: { id: referrer.id },
             data: { remainingGenerations: referrer.remainingGenerations + DEFAULT_GENERATIONS },
           });
-          
+
           // Add 5 generations to the new user as well (in addition to default)
           await tx.user.update({
             where: { id: newUser.id },

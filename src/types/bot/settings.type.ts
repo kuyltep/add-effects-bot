@@ -6,10 +6,10 @@ export type Resolution = 'SQUARE' | 'VERTICAL' | 'HORIZONTAL';
 /**
  * Setting action types available in the settings scene
  */
-export type SettingsAction = 
-  | 'change_resolution' 
+export type SettingsAction =
+  | 'change_resolution'
   | 'toggle_negative_prompt'
-  | 'toggle_seed' 
+  | 'toggle_seed'
   | 'change_batch_size'
   | 'change_language'
   | 'square'
@@ -30,4 +30,4 @@ export interface SettingsButtonConfig {
   labelKey: string;
   /** The action that will be triggered when the button is clicked */
   action: SettingsAction;
-} 
+}

@@ -4,12 +4,11 @@ import { processCompletedVideo } from '../services/replicate';
 
 export default async function (fastify: FastifyInstance, options: FastifyPluginOptions) {
   // Video generation webhook callback
-  fastify.post(
-    '/video-webhook/:webhookId',
-    async (request, reply) => {
-      try {
-        const { webhookId } = request.params as { webhookId: string };
-        const { generationId, chatId, userId, messageId, language, effect, source } = request.query as {
+  fastify.post('/video-webhook/:webhookId', async (request, reply) => {
+    try {
+      const { webhookId } = request.params as { webhookId: string };
+      const { generationId, chatId, userId, messageId, language, effect, source } =
+        request.query as {
           generationId: string;
           chatId: string;
           userId: string;
@@ -18,85 +17,89 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
           effect: string;
           source: string;
         };
-        
-        // Validate required parameters
-        if (!generationId || !chatId || !userId || !messageId) {
-          request.log.error('Missing required parameters in video webhook');
-          return reply.status(400).send({ error: 'Missing required parameters' });
-        }
 
-        // Get prediction data from request body
-        const prediction = request.body as any;
-        request.log.info(`Received video webhook for generation ${generationId}, effect: ${effect}, status: ${prediction?.status || 'unknown'}`);
-        
-        // Log prediction for debugging
-        if (process.env.NODE_ENV !== 'production') {
-          console.log("Prediction data:", JSON.stringify(prediction, null, 2));
-        }
-        
-        let videoUrl: string | null = null;
-        
-        // Handle different model responses based on effect type
-        const falEffects = ['hug', 'kiss', 'jesus', 'microwave'];
-        
-        if (falEffects.includes(effect)) {
-          // FAL AI model response format
-          if (prediction?.payload?.video?.url) {
-            videoUrl = prediction.payload.video.url;
-          }
-        } else {
-          // Replicate model response format
-          if (prediction?.status === 'succeeded' && prediction?.output) {
-            videoUrl = prediction.output;
-          }
-        }
-
-        // Process the video if we have a URL
-        if (videoUrl) {
-          await processCompletedVideo(
-            generationId,
-            videoUrl,
-            parseInt(chatId, 10),
-            parseInt(messageId, 10),
-            language || 'en',
-            source
-          );
-          return reply.send({ success: true });
-        }
-        
-        // If prediction failed
-        if (prediction?.status?.toLowerCase() === 'failed' || prediction?.status?.toLowerCase() === 'error') {
-          // Update generation status
-          await prisma.generation.update({
-            where: { id: generationId },
-            data: {
-              status: 'FAILED',
-              error: prediction.error || 'Video generation failed'
-            }
-          });
-          
-          // Refund the user
-          await prisma.user.update({
-            where: { id: userId },
-            data: {
-              remainingGenerations: {
-                increment: parseInt(process.env.VIDEO_GENERATION_COST || '10', 10) // VIDEO_GENERATION_COST
-              }
-            }
-          });
-          
-          request.log.error('Video generation failed', prediction);
-          return reply.send({ success: false, error: 'Video generation failed' });
-        }
-        
-        // For other statuses, just acknowledge
-        return reply.send({ success: true, status: prediction?.status || 'processing' });
-      } catch (error) {
-        request.log.error('Error processing video webhook', error);
-        return reply.status(500).send({ error: 'Failed to process webhook' });
+      // Validate required parameters
+      if (!generationId || !chatId || !userId || !messageId) {
+        request.log.error('Missing required parameters in video webhook');
+        return reply.status(400).send({ error: 'Missing required parameters' });
       }
+
+      // Get prediction data from request body
+      const prediction = request.body as any;
+      request.log.info(
+        `Received video webhook for generation ${generationId}, effect: ${effect}, status: ${prediction?.status || 'unknown'}`
+      );
+
+      // Log prediction for debugging
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('Prediction data:', JSON.stringify(prediction, null, 2));
+      }
+
+      let videoUrl: string | null = null;
+
+      // Handle different model responses based on effect type
+      const falEffects = ['hug', 'kiss', 'jesus', 'microwave'];
+
+      if (falEffects.includes(effect)) {
+        // FAL AI model response format
+        if (prediction?.payload?.video?.url) {
+          videoUrl = prediction.payload.video.url;
+        }
+      } else {
+        // Replicate model response format
+        if (prediction?.status === 'succeeded' && prediction?.output) {
+          videoUrl = prediction.output;
+        }
+      }
+
+      // Process the video if we have a URL
+      if (videoUrl) {
+        await processCompletedVideo(
+          generationId,
+          videoUrl,
+          parseInt(chatId, 10),
+          parseInt(messageId, 10),
+          language || 'en',
+          source
+        );
+        return reply.send({ success: true });
+      }
+
+      // If prediction failed
+      if (
+        prediction?.status?.toLowerCase() === 'failed' ||
+        prediction?.status?.toLowerCase() === 'error'
+      ) {
+        // Update generation status
+        await prisma.generation.update({
+          where: { id: generationId },
+          data: {
+            status: 'FAILED',
+            error: prediction.error || 'Video generation failed',
+          },
+        });
+
+        // Refund the user
+        await prisma.user.update({
+          where: { id: userId },
+          data: {
+            remainingGenerations: {
+              increment: parseInt(process.env.VIDEO_GENERATION_COST || '10', 10), // VIDEO_GENERATION_COST
+            },
+          },
+        });
+
+        request.log.error('Video generation failed', prediction);
+        return reply.send({ success: false, error: 'Video generation failed' });
+      }
+
+      // For other statuses, just acknowledge
+      return reply.send({ success: true, status: prediction?.status || 'processing' });
+    } catch (error) {
+      request.log.error('Error processing video webhook', error);
+      return reply.status(500).send({ error: 'Failed to process webhook' });
     }
-  );
+  });
 
   // Get a specific generation
   fastify.get(

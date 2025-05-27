@@ -29,7 +29,7 @@ export const bot = new Telegraf<MyContext>(process.env.TELEGRAM_BOT_TOKEN || '')
 
 // Get all scenes
 const scenes = [
-  generateScene, 
+  generateScene,
   settingsScene,
   supportMenuScene,
   startScene,
@@ -41,7 +41,7 @@ const scenes = [
   paymentScene,
   videoScene,
   upgradeScene,
-  videoEffectScene
+  videoEffectScene,
 ];
 
 // Создаем менеджер сцен
@@ -53,15 +53,17 @@ const stage = new Scenes.Stage<MyContext>(scenes as any);
 stage.use(createMainKeyboardMiddleware());
 
 // Устанавливаем middleware
-bot.use(session({
-  // Make sure the session persists properly between updates
-  property: 'session',
-  getSessionKey: (ctx) => {
-    // Get a unique session key based on the Telegram user ID to persist state
-    const userId = ctx.from?.id;
-    return userId ? `user:${userId}` : undefined;
-  }
-}));
+bot.use(
+  session({
+    // Make sure the session persists properly between updates
+    property: 'session',
+    getSessionKey: ctx => {
+      // Get a unique session key based on the Telegram user ID to persist state
+      const userId = ctx.from?.id;
+      return userId ? `user:${userId}` : undefined;
+    },
+  })
+);
 bot.use(i18nMiddleware()); // Use our custom i18n middleware
 bot.use(checkBannedUser); // Add banned user check middleware
 bot.use(checkChannelSubscription);
@@ -77,18 +79,22 @@ bot.use((ctx, next) => {
 bot.catch((err, ctx) => {
   const userId = ctx.from?.id || 'unknown';
   const chatId = ctx.chat?.id || 'unknown';
-  
+
   // Check if error is a TelegramError with description
-  if (typeof err === 'object' && err !== null && 'description' in err && typeof err.description === 'string' && (
-    err.description.includes('bot was blocked by the user') || 
-    err.description.includes('user is deactivated') || 
-    err.description.includes('chat not found'))
+  if (
+    typeof err === 'object' &&
+    err !== null &&
+    'description' in err &&
+    typeof err.description === 'string' &&
+    (err.description.includes('bot was blocked by the user') ||
+      err.description.includes('user is deactivated') ||
+      err.description.includes('chat not found'))
   ) {
     console.warn(`Bot blocked or chat unavailable - User: ${userId}, Chat: ${chatId}`);
   } else {
     console.error(`Unhandled bot error for User: ${userId}, Chat: ${chatId}:`, err);
   }
-  
+
   // Don't crash, swallow the error but log it
 });
 
@@ -108,30 +114,26 @@ function setupRedisSubscriber() {
     'bot:send_document',
     'bot:crease_error_choice',
     'bot:payment_success',
-    'bot:send_effect',
+    'bot:send_effect'
   );
-  
+
   // Handle messages
   redisSubscriber.on('message', async (channel, message) => {
     try {
       const data = JSON.parse(message);
-      
+
       switch (channel) {
         case 'bot:status_update':
           // Update status message
           if (data.text && data.text !== 'undefined') {
-            await bot.telegram.editMessageText(
-              data.chatId,
-              data.messageId,
-              undefined,
-              data.text,
-              { parse_mode: data.parseMode || 'HTML' }
-            );
+            await bot.telegram.editMessageText(data.chatId, data.messageId, undefined, data.text, {
+              parse_mode: data.parseMode || 'HTML',
+            });
           } else {
             console.warn('Received status update with undefined text, skipping message edit');
           }
           break;
-          
+
         case 'bot:delete_message':
           // Delete a message
           try {
@@ -140,7 +142,7 @@ function setupRedisSubscriber() {
             console.error('Error deleting message:', error);
           }
           break;
-          
+
         case 'bot:download_file':
           // Download a file from Telegram
           try {
@@ -149,39 +151,40 @@ function setupRedisSubscriber() {
               console.error('Missing fileId or downloadPath in download_file request');
               return;
             }
-            
-            
+
             // Get file link from Telegram
             const fileLink = await bot.telegram.getFileLink(fileId);
             if (!fileLink) {
               console.error(`Failed to get file link for ${fileId}`);
               return;
             }
-            
+
             // Download the file - handle both string and object with href
             const fileUrl = typeof fileLink === 'string' ? fileLink : fileLink.href;
-            
+
             const response = await fetch(fileUrl);
             if (!response.ok) {
               throw new Error(`Failed to download file: ${response.statusText}`);
             }
-            
+
             // Ensure directory exists
             const downloadDir = path.dirname(downloadPath);
             if (!fs.existsSync(downloadDir)) {
               fs.mkdirSync(downloadDir, { recursive: true });
             }
-            
+
             // Save file to disk
             const fileBuffer = await response.arrayBuffer();
             fs.writeFileSync(downloadPath, Buffer.from(fileBuffer));
-            
-            console.log(`File downloaded successfully to ${downloadPath} (${fileBuffer.byteLength} bytes)`);
+
+            console.log(
+              `File downloaded successfully to ${downloadPath} (${fileBuffer.byteLength} bytes)`
+            );
           } catch (error) {
             console.error('Error downloading file:', error);
           }
           break;
-          
+
         case 'bot:send_video':
           // Send video to user
           await sendVideoToUser(data);
@@ -196,8 +199,7 @@ function setupRedisSubscriber() {
           // Handle payment success notification
           await sendPaymentSuccessNotification(data);
           break;
-          
-          
+
         case 'bot:send_effect':
           // Send effect results to user
           await sendEffectResults(data);
@@ -207,77 +209,91 @@ function setupRedisSubscriber() {
       console.error('Error handling Redis message:', error, 'on channel:', channel);
     }
   });
-  
+
   // Handle connection errors
-  redisSubscriber.on('error', (error) => {
+  redisSubscriber.on('error', error => {
     console.error('Redis subscriber error:', error);
   });
-  
+
   console.log('Redis subscriber initialized for bot-worker communication');
 }
 
 // Function to send video to user
 async function sendVideoToUser(data) {
   try {
-    const { chatId, videoUrl, caption, parseMode = 'HTML', language, userId, remainingGenerations, source } = data;
-    
+    const {
+      chatId,
+      videoUrl,
+      caption,
+      parseMode = 'HTML',
+      language,
+      userId,
+      remainingGenerations,
+      source,
+    } = data;
+
     if (!chatId || !videoUrl) {
       console.error('Missing required data for sending video');
       return;
     }
-    
+
     // Send the video with caption
     if (videoUrl.startsWith('http')) {
       // If URL, send directly
-    await bot.telegram.sendVideo(chatId, videoUrl, {
-      caption: caption,
-        parse_mode: parseMode
-    });
+      await bot.telegram.sendVideo(chatId, videoUrl, {
+        caption: caption,
+        parse_mode: parseMode,
+      });
     } else if (fs.existsSync(videoUrl)) {
       // If local file, send from disk
-      await bot.telegram.sendVideo(chatId, { source: videoUrl }, {
-        caption: caption,
-        parse_mode: parseMode
-      });
+      await bot.telegram.sendVideo(
+        chatId,
+        { source: videoUrl },
+        {
+          caption: caption,
+          parse_mode: parseMode,
+        }
+      );
     } else {
       throw new Error(`Video file not found: ${videoUrl}`);
     }
-    
+
     // If we have user ID and remaining generations, send the buttons
     if (userId && typeof remainingGenerations !== 'undefined') {
       // Send remaining generations info with buttons
-      const remainingGenerationsText = language === 'ru'
-        ? `Отлично получилось 😎\nОсталось генераций: ${remainingGenerations}`
-        : `Great job 😎\nRemaining generations: ${remainingGenerations}`;
-      
+      const remainingGenerationsText =
+        language === 'ru'
+          ? `Отлично получилось 😎\nОсталось генераций: ${remainingGenerations}`
+          : `Great job 😎\nRemaining generations: ${remainingGenerations}`;
+
       // Button labels based on language
-      const generateMoreText = language === 'ru' ? '✨ Сгенерировать еще картинку' : '✨ Generate More Pictures';
+      const generateMoreText =
+        language === 'ru' ? '✨ Сгенерировать еще картинку' : '✨ Generate More Pictures';
       const videoEffectsText = language === 'ru' ? '🎭 Другие эффекты' : '🎭 Other Effects';
-      
+
       // Use the appropriate callback data for video effects based on source
-      const videoEffectsCallbackData = source === 'generate' 
-        ? 'video_effect_from_generate' 
-        : 'generate_video_effect';
-      
+      const videoEffectsCallbackData =
+        source === 'generate' ? 'video_effect_from_generate' : 'generate_video_effect';
+
       await bot.telegram.sendMessage(chatId, remainingGenerationsText, {
         parse_mode: 'HTML',
         reply_markup: {
           inline_keyboard: [
             [{ text: generateMoreText, callback_data: 'generate_more' }],
-            [{ text: videoEffectsText, callback_data: videoEffectsCallbackData }]
-          ]
-        }
+            [{ text: videoEffectsText, callback_data: videoEffectsCallbackData }],
+          ],
+        },
       });
     }
   } catch (error) {
     console.error('Error sending video to user:', error);
-    
+
     try {
       if (data.chatId) {
         await bot.telegram.sendMessage(
           data.chatId,
-          data.language === 'ru' 
-            ? '❌ Ошибка при отправке видео. Пожалуйста, попробуйте позже.' 
+          data.language === 'ru'
+            ? '❌ Ошибка при отправке видео. Пожалуйста, попробуйте позже.'
             : '❌ Error sending video. Please try again later.',
           { parse_mode: 'HTML' }
         );
@@ -288,43 +304,47 @@ async function sendVideoToUser(data) {
   }
 }
 
-
 // Function to send document to user
 async function sendDocumentToUser(data) {
   try {
     const { chatId, documentUrl, caption, isUpgrade } = data;
-    
+
     if (!chatId || !documentUrl) {
       console.error('Missing required data for sending document');
       return;
     }
-    
-    
+
     // Send the document with caption
     if (documentUrl.startsWith('http')) {
       // If URL, send directly
-    await bot.telegram.sendDocument(chatId, documentUrl, {
-      caption: caption,
-      parse_mode: 'HTML',
-    });
-    } else if (fs.existsSync(documentUrl)) {
-      // If local file, send from disk
-      await bot.telegram.sendDocument(chatId, { source: documentUrl }, {
+      await bot.telegram.sendDocument(chatId, documentUrl, {
         caption: caption,
         parse_mode: 'HTML',
       });
+    } else if (fs.existsSync(documentUrl)) {
+      // If local file, send from disk
+      await bot.telegram.sendDocument(
+        chatId,
+        { source: documentUrl },
+        {
+          caption: caption,
+          parse_mode: 'HTML',
+        }
+      );
     } else {
       throw new Error(`Document file not found: ${documentUrl}`);
     }
-    
   } catch (error) {
     console.error('Error sending document to user:', error);
-    
+
     try {
       if (data.chatId) {
         await bot.telegram.sendMessage(
           data.chatId,
-          i18next.t('bot:generate.error', { lng: data.language, supportUsername: process.env.SUPPORT_USERNAME }),
+          i18next.t('bot:generate.error', {
+            lng: data.language,
+            supportUsername: process.env.SUPPORT_USERNAME,
+          }),
           { parse_mode: 'HTML' }
         );
       }
@@ -335,7 +355,7 @@ async function sendDocumentToUser(data) {
 }
 
 // Function to send payment success notification to user
-async function sendPaymentSuccessNotification(data: { 
+async function sendPaymentSuccessNotification(data: {
   telegramId: string;
   generationsAdded: number;
   amount: number;
@@ -349,25 +369,25 @@ async function sendPaymentSuccessNotification(data: {
     // Get user with settings to determine language
     const user = await prisma.user.findFirst({
       where: { telegramId: data.telegramId },
-      include: { settings: true }
+      include: { settings: true },
     });
-    
+
     // Default to Russian if no language preference found
     const language = user?.settings?.language?.toLowerCase() || 'ru';
-    
+
     // Send payment success message
     await bot.telegram.sendMessage(
       data.telegramId,
-      i18next.t('bot:payments.success', { 
+      i18next.t('bot:payments.success', {
         lng: language,
         count: data.generationsAdded,
-        amount: data.amount
+        amount: data.amount,
       }),
-      { 
+      {
         parse_mode: 'HTML',
       }
     );
-    
+
     console.log(`Payment success notification sent to user ${data.telegramId}`);
   } catch (error) {
     console.error('Error sending payment success notification:', error);
@@ -377,61 +397,48 @@ async function sendPaymentSuccessNotification(data: {
 // Function to send effect results via bot
 async function sendEffectResults(data) {
   const chatId = data?.chatId;
-  const { 
-    imageData,
-    userId,
-    language,
-    referralCode,
-    generationId,
-    effect
-  } = data;
+  const { imageData, userId, language, referralCode, generationId, effect } = data;
   try {
-
-    
     if (!chatId || !imageData) {
       console.error('Missing chatId or imageData in effect results data');
       return;
     }
 
-    
     // Check if the image path is a URL or local file
     const imagePath = imageData.path;
-    const isUrl = imageData.isUrl || (typeof imagePath === 'string' && imagePath.startsWith('http'));
+    const isUrl =
+      imageData.isUrl || (typeof imagePath === 'string' && imagePath.startsWith('http'));
 
     // Get localized completion message
-    const completionMessage = i18next.t('bot:generate.completed', { 
-      lng: language
+    const completionMessage = i18next.t('bot:generate.completed', {
+      lng: language,
     });
-    
+
     // Add watermark text
-    const watermarkText = i18next.t('bot:generate.watermark', { 
+    const watermarkText = i18next.t('bot:generate.watermark', {
       botUsername: process.env.BOT_USERNAME,
       lng: language,
-      referralCode
+      referralCode,
     });
-    
+
     // Send the effect image with caption
     console.log(`Sending effect image to chat ${chatId}: ${imagePath} (isUrl: ${isUrl})`);
-    
+
     try {
       if (isUrl) {
         // Use URL directly for remote images
-        await bot.telegram.sendPhoto(
-          chatId, 
-          imagePath, 
-          {
-            caption: `${completionMessage}\n\n${watermarkText}`,
-            parse_mode: 'HTML'
-          }
-        );
+        await bot.telegram.sendPhoto(chatId, imagePath, {
+          caption: `${completionMessage}\n\n${watermarkText}`,
+          parse_mode: 'HTML',
+        });
       } else if (fs.existsSync(imagePath)) {
         // Use local file if it exists
         await bot.telegram.sendPhoto(
-          chatId, 
-          { source: imagePath }, 
+          chatId,
+          { source: imagePath },
           {
             caption: `${completionMessage}\n\n${watermarkText}`,
-            parse_mode: 'HTML'
+            parse_mode: 'HTML',
           }
         );
       } else {
@@ -445,26 +452,21 @@ async function sendEffectResults(data) {
         { parse_mode: 'HTML' }
       );
     }
-    
 
     // Also send the full-size file as document
     try {
       if (isUrl) {
-        await bot.telegram.sendDocument(
-          chatId, 
-          imagePath, 
-          {
-            caption: i18next.t('bot:generate.documents_message', { lng: language }),
-            parse_mode: 'HTML'
-          }
-        );
+        await bot.telegram.sendDocument(chatId, imagePath, {
+          caption: i18next.t('bot:generate.documents_message', { lng: language }),
+          parse_mode: 'HTML',
+        });
       } else if (fs.existsSync(imagePath)) {
         await bot.telegram.sendDocument(
-          chatId, 
-          { source: imagePath }, 
+          chatId,
+          { source: imagePath },
           {
             caption: i18next.t('bot:generate.documents_message', { lng: language }),
-            parse_mode: 'HTML'
+            parse_mode: 'HTML',
           }
         );
       }
@@ -472,38 +474,37 @@ async function sendEffectResults(data) {
       console.error('Error sending document:', docError);
       // Continue even if document send fails
     }
-    
 
     // Get the user's remaining restorations
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { remainingGenerations: true }
+      select: { remainingGenerations: true },
     });
-      
+
     if (user) {
       // Send remaining generations info with buttons
       const remainingGenerationsText = i18next.t('bot:generate.remainingGenerations', {
         lng: language,
-        count: user.remainingGenerations
+        count: user.remainingGenerations,
       });
-      
+
       // Create a keyboard with generation info
       const generateMoreText = i18next.t('bot:buttons.generate_more', { lng: language });
       const inviteFriendsText = i18next.t('bot:buttons.invite_friend', { lng: language });
       const generateVideoText = i18next.t('bot:buttons.generate_video', { lng: language });
       const videoEffectsText = i18next.t('bot:buttons.video_effects', { lng: language });
-      
+
       const keyboard = Markup.inlineKeyboard([
         [
           Markup.button.callback(generateMoreText, 'generate_more'),
-          Markup.button.callback(inviteFriendsText, 'invite_friend')
+          Markup.button.callback(inviteFriendsText, 'invite_friend'),
         ],
         [
           Markup.button.callback(generateVideoText, 'generate_video'),
-          Markup.button.callback(videoEffectsText, 'generate_video_effect')
-        ]
+          Markup.button.callback(videoEffectsText, 'generate_video_effect'),
+        ],
       ]);
-      
+
       await bot.telegram.sendMessage(chatId, remainingGenerationsText, keyboard);
     }
   } catch (error) {
@@ -512,8 +513,11 @@ async function sendEffectResults(data) {
       if (chatId) {
         // Send error message as fallback
         await bot.telegram.sendMessage(
-          chatId, 
-          i18next.t('bot:generate.error', { lng: language, supportUsername: process.env.SUPPORT_USERNAME }),
+          chatId,
+          i18next.t('bot:generate.error', {
+            lng: language,
+            supportUsername: process.env.SUPPORT_USERNAME,
+          }),
           { parse_mode: 'HTML' }
         );
       }
@@ -522,7 +526,6 @@ async function sendEffectResults(data) {
     }
   }
 }
-
 
 export async function stopBot() {
   console.log('Stopping bot...');
@@ -562,7 +565,6 @@ export async function stopBot() {
   console.log('Bot stopped.');
 }
 
-
 export async function startBot() {
   try {
     // Initialize Redis clients
@@ -570,69 +572,72 @@ export async function startBot() {
     redisPublisher = createRedisPublisher();
     redisConnection = createRedisConnection();
     setupRedisSubscriber();
-    
+
     // Command handlers
-    bot.command('start', async (ctx) => await ctx.scene.enter('start'));
-    bot.command('generate', async (ctx) => await ctx.scene.enter('generate'));
-    bot.command('settings', async (ctx) => await ctx.scene.enter('settings'));
-    bot.command('account', async (ctx) => await ctx.scene.enter('account'));
-    bot.command('referral', async (ctx) => await ctx.scene.enter('referral'));
-    bot.command('help', async (ctx) => await ctx.scene.enter('help'));
-    bot.command('links', async (ctx) => await ctx.scene.enter('links'));
-    bot.command('packages', async (ctx) => await ctx.scene.enter('packages'));
-    bot.command('video', async (ctx) => await ctx.scene.enter('video'));
-    bot.command('upgrade', async (ctx) => await ctx.scene.enter('upgrade'));
-    bot.command('video_effect', async (ctx) => await ctx.scene.enter('videoEffect', { source: 'command' }));
-    
+    bot.command('start', async ctx => await ctx.scene.enter('start'));
+    bot.command('generate', async ctx => await ctx.scene.enter('generate'));
+    bot.command('settings', async ctx => await ctx.scene.enter('settings'));
+    bot.command('account', async ctx => await ctx.scene.enter('account'));
+    bot.command('referral', async ctx => await ctx.scene.enter('referral'));
+    bot.command('help', async ctx => await ctx.scene.enter('help'));
+    bot.command('links', async ctx => await ctx.scene.enter('links'));
+    bot.command('packages', async ctx => await ctx.scene.enter('packages'));
+    bot.command('video', async ctx => await ctx.scene.enter('video'));
+    bot.command('upgrade', async ctx => await ctx.scene.enter('upgrade'));
+    bot.command(
+      'video_effect',
+      async ctx => await ctx.scene.enter('videoEffect', { source: 'command' })
+    );
+
     // Добавляем обработчик для кнопки создания еще
-    bot.action('generate_more', async (ctx) => {
+    bot.action('generate_more', async ctx => {
       await ctx.answerCbQuery();
       await ctx.scene.enter('generate');
     });
-    
+
     // Добавляем обработчик для кнопки приглашения друга
-    bot.action('invite_friend', async (ctx) => {
+    bot.action('invite_friend', async ctx => {
       await ctx.answerCbQuery();
       await ctx.scene.enter('referral');
     });
-    
+
     // Добавляем обработчик для кнопки создания видео
-    bot.action('generate_video', async (ctx) => {
+    bot.action('generate_video', async ctx => {
       await ctx.answerCbQuery();
       await ctx.scene.enter('video');
     });
-    
+
     // Добавляем обработчик для кнопки добавления видео-эффектов
-    bot.action('generate_video_effect', async (ctx) => {
+    bot.action('generate_video_effect', async ctx => {
       await ctx.answerCbQuery();
       await ctx.scene.enter('videoEffect', { source: 'command' });
     });
-    
+
     // Добавляем обработчик для кнопки улучшения изображения (для обратной совместимости)
-    bot.action('upgrade_image', async (ctx) => {
+    bot.action('upgrade_image', async ctx => {
       await ctx.answerCbQuery();
       await ctx.scene.enter('upgrade');
     });
-    
+
     // Добавляем обработчик для кнопки покупки генераций
-    bot.action('buy_generations', async (ctx) => {
+    bot.action('buy_generations', async ctx => {
       await ctx.answerCbQuery();
       await ctx.scene.enter('packages');
     });
-    
+
     // Добавляем обработчик для кнопки видео-эффектов
-    bot.action('video_effect', async (ctx) => {
+    bot.action('video_effect', async ctx => {
       await ctx.answerCbQuery();
       await ctx.scene.enter('videoEffect', { source: 'command' });
     });
-    
+
     // Adding a handler for video effects from generate scene
-    bot.action('video_effect_from_generate', async (ctx) => {
+    bot.action('video_effect_from_generate', async ctx => {
       await ctx.answerCbQuery();
       await ctx.scene.enter('videoEffect', { source: 'generate' });
     });
-    
-      await bot.launch();
+
+    await bot.launch();
 
     await bot.telegram.setMyCommands([
       { command: 'start', description: 'Start the bot' },
@@ -644,7 +649,7 @@ export async function startBot() {
       { command: 'packages', description: 'Buy restoration packages' },
       { command: 'video', description: 'Generate video from restored photo' },
       { command: 'upgrade', description: 'Enhance photo quality' },
-      { command: 'video_effect', description: 'Apply video effects to photo' }
+      { command: 'video_effect', description: 'Apply video effects to photo' },
     ]);
   } catch (error) {
     console.error('Error starting Telegram bot:', error);

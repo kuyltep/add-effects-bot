@@ -37,17 +37,17 @@ export async function getUserSettings(userId: string): Promise<UserSettings | nu
  */
 export async function getOrCreateUserSettings(userId: string): Promise<UserSettings> {
   const settings = await prisma.userSettings.findUnique({
-    where: { userId }
+    where: { userId },
   });
-  
+
   if (settings) return settings;
-  
+
   return prisma.userSettings.create({
     data: {
       userId,
       resolution: 'SQUARE',
       language: 'RU',
-    }
+    },
   });
 }
 
@@ -60,7 +60,7 @@ export async function getOrCreateUserSettings(userId: string): Promise<UserSetti
 export async function updateUserSettings(userId: string, data: any) {
   return prisma.userSettings.update({
     where: { userId },
-    data
+    data,
   });
 }
 
@@ -87,15 +87,19 @@ export function getResolutionDimensions(resolution: Resolution): ResolutionDimen
  */
 export function createSettingsKeyboard(locale: string) {
   return Markup.inlineKeyboard([
-    [Markup.button.callback(
-      i18next.t('bot:settings.change_resolution', { lng: locale }),
-      'change_resolution'
-    )],
+    [
+      Markup.button.callback(
+        i18next.t('bot:settings.change_resolution', { lng: locale }),
+        'change_resolution'
+      ),
+    ],
 
-    [Markup.button.callback(
-      i18next.t('bot:keyboard.support_menu', { lng: locale }),
-      'support_menu'
-    )]
+    [
+      Markup.button.callback(
+        i18next.t('bot:keyboard.support_menu', { lng: locale }),
+        'support_menu'
+      ),
+    ],
   ]);
 }
 
@@ -106,21 +110,26 @@ export function createSettingsKeyboard(locale: string) {
  */
 export function createResolutionKeyboard(locale: string) {
   return Markup.inlineKeyboard([
-    [Markup.button.callback(
-      i18next.t('bot:settings.resolution_square', { lng: locale }),
-      'square'
-    )],
-    [Markup.button.callback(
-      i18next.t('bot:settings.resolution_vertical', { lng: locale }),
-      'vertical'
-    )],
-    [Markup.button.callback(
-      i18next.t('bot:settings.resolution_horizontal', { lng: locale }),
-      'horizontal'
-    )]
+    [
+      Markup.button.callback(
+        i18next.t('bot:settings.resolution_square', { lng: locale }),
+        'square'
+      ),
+    ],
+    [
+      Markup.button.callback(
+        i18next.t('bot:settings.resolution_vertical', { lng: locale }),
+        'vertical'
+      ),
+    ],
+    [
+      Markup.button.callback(
+        i18next.t('bot:settings.resolution_horizontal', { lng: locale }),
+        'horizontal'
+      ),
+    ],
   ]);
 }
-
 
 /**
  * Создает клавиатуру для выбора языка.
@@ -129,7 +138,7 @@ export function createResolutionKeyboard(locale: string) {
 export function createLanguageKeyboard() {
   return Markup.inlineKeyboard([
     [Markup.button.callback('English', 'lang_EN')],
-    [Markup.button.callback('Русский', 'lang_RU')]
+    [Markup.button.callback('Русский', 'lang_RU')],
   ]);
 }
 
@@ -154,10 +163,14 @@ export function formatBooleanValue(locale: string, value: boolean): string {
 export function getLocalizedResolutionName(locale: string, resolution: Resolution): string {
   const lang = locale.toLowerCase().startsWith('ru') ? 'ru' : 'en';
   switch (resolution) {
-    case 'SQUARE': return i18next.t('bot:settings.resolution_square', { lng: lang });
-    case 'VERTICAL': return i18next.t('bot:settings.resolution_vertical', { lng: lang });
-    case 'HORIZONTAL': return i18next.t('bot:settings.resolution_horizontal', { lng: lang });
-    default: return i18next.t('bot:settings.resolution_square', { lng: lang }); // По умолчанию квадратное
+    case 'SQUARE':
+      return i18next.t('bot:settings.resolution_square', { lng: lang });
+    case 'VERTICAL':
+      return i18next.t('bot:settings.resolution_vertical', { lng: lang });
+    case 'HORIZONTAL':
+      return i18next.t('bot:settings.resolution_horizontal', { lng: lang });
+    default:
+      return i18next.t('bot:settings.resolution_square', { lng: lang }); // По умолчанию квадратное
   }
 }
 
@@ -185,9 +198,13 @@ export function getLocalizedLanguageName(displayLocale: string, languageCode: st
  * @param dimensions Объект с текущими размерами изображения.
  * @returns Отформатированная строка с информацией о настройках.
  */
-export function formatSettingsInfo(locale: string, settings: UserSettings, dimensions: ResolutionDimensions): string {
+export function formatSettingsInfo(
+  locale: string,
+  settings: UserSettings,
+  dimensions: ResolutionDimensions
+): string {
   const lang = locale.toLowerCase().startsWith('ru') ? 'ru' : 'en';
-  
+
   // Получаем локализованные значения
   const resolutionText = getLocalizedResolutionName(lang, settings.resolution);
   const languageText = getLocalizedLanguageName(lang, settings.language || 'EN');

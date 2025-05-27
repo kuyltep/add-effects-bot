@@ -3,17 +3,12 @@ import { GenerationPackageType } from '../../services/payment';
 /**
  * Types of wizard steps in the generation process
  */
-export type GenerationStep = 
-  | 'prompt'
-  | 'negativePrompt'
-  | 'seed'
-  | 'batchSize'
-  | 'processing';
+export type GenerationStep = 'prompt' | 'negativePrompt' | 'seed' | 'batchSize' | 'processing';
 
 /**
  * Types of wizard scene actions
  */
-export type SceneAction = 
+export type SceneAction =
   | 'skip_negative'
   | 'random_seed'
   | 'cancel'
@@ -84,15 +79,15 @@ export interface StartSceneParams {
  */
 export interface VideoSceneState {
   imagePath?: string;
-  imagePaths?: string[];  // Keep for backward compatibility
+  imagePaths?: string[]; // Keep for backward compatibility
   validImagePaths?: string[];
   selectedImagePath?: string;
   prompt?: string;
   selectedEffect?: string;
   customPrompt?: string;
   waitingForPrompt?: boolean;
-  messageId?: number;  // Store message ID for deletion
-  source?: 'command' | 'generate';  // Track where the user entered from
+  messageId?: number; // Store message ID for deletion
+  source?: 'command' | 'generate'; // Track where the user entered from
 }
 
 /**
@@ -100,7 +95,7 @@ export interface VideoSceneState {
  */
 export interface UpgradeSceneState {
   imagePath?: string;
-  imagePaths?: string[];  // Keep for backward compatibility
+  imagePaths?: string[]; // Keep for backward compatibility
   validImagePaths?: string[];
   selectedImagePath?: string;
-} 
+}

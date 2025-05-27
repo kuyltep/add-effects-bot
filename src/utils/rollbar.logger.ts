@@ -12,10 +12,7 @@ export function initializeRollbar() {
   return rollbarInstance;
 }
 
-
-
 export class Logger {
-
   private static rollbarInstance = initializeRollbar();
 
   static error(error: Error | string, context?: Record<string, any>): void {
@@ -24,7 +21,7 @@ export class Logger {
       error instanceof Error ? { message: error.message, stack: error.stack } : error,
       context || ''
     );
-    
+
     // Log to Rollbar for production monitoring
     if (error instanceof Error) {
       this.rollbarInstance.error(error, context);
@@ -32,7 +29,7 @@ export class Logger {
       this.rollbarInstance.error(new Error(error), context);
     }
   }
-  
+
   /**
    * Log a warning
    */
@@ -41,10 +38,10 @@ export class Logger {
     if (process.env.NODE_ENV !== 'production') {
       console.warn('[WARN]', message, context || '');
     }
-    
+
     this.rollbarInstance.warn(message, context);
   }
-  
+
   /**
    * Log an informational message
    */
@@ -53,7 +50,7 @@ export class Logger {
     if (process.env.NODE_ENV !== 'production' || process.env.DEBUG) {
       console.log('[INFO]', message, context || '');
     }
-    
+
     // Optionally log to Rollbar at info level
     this.rollbarInstance.info(message, context);
   }
@@ -64,14 +61,13 @@ export class Logger {
       error instanceof Error ? { message: error.message, stack: error.stack } : error,
       context || ''
     );
-    
+
     if (error instanceof Error) {
       this.rollbarInstance.critical(error, context);
     } else {
       this.rollbarInstance.critical(new Error(error), context);
     }
   }
-  
 
   static withContext(baseContext: Record<string, any>) {
     return {
@@ -86,9 +82,7 @@ export class Logger {
       },
       critical: (error: Error | string, additionalContext?: Record<string, any>) => {
         Logger.critical(error, { ...baseContext, ...additionalContext });
-      }
+      },
     };
   }
 }
-
-

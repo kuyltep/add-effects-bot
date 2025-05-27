@@ -5,7 +5,7 @@ import { ReferralProcessResult } from '../types/user.type';
  * Process a referral code and reward both users
  */
 export async function processReferralCode(
-  referralCode: string, 
+  referralCode: string,
   userId: string
 ): Promise<ReferralProcessResult> {
   try {
@@ -15,9 +15,9 @@ export async function processReferralCode(
     });
 
     if (!referrer || referrer.id === userId) {
-      return { 
-        success: false, 
-        error: !referrer ? 'Invalid referral code' : 'Self-referral not allowed' 
+      return {
+        success: false,
+        error: !referrer ? 'Invalid referral code' : 'Self-referral not allowed',
       };
     }
 
@@ -27,9 +27,9 @@ export async function processReferralCode(
     });
 
     if (existingReferral) {
-      return { 
-        success: false, 
-        error: 'User already referred' 
+      return {
+        success: false,
+        error: 'User already referred',
       };
     }
 
@@ -43,24 +43,28 @@ export async function processReferralCode(
 
     await prisma.user.update({
       where: { id: referrer.id },
-      data: { remainingGenerations: { increment: parseInt(process.env.DEFAULT_GENERATIONS || '3', 10) } },
+      data: {
+        remainingGenerations: { increment: parseInt(process.env.DEFAULT_GENERATIONS || '3', 10) },
+      },
     });
 
     await prisma.user.update({
       where: { id: userId },
-      data: { remainingGenerations: { increment: parseInt(process.env.DEFAULT_GENERATIONS || '3', 10) } },
+      data: {
+        remainingGenerations: { increment: parseInt(process.env.DEFAULT_GENERATIONS || '3', 10) },
+      },
     });
-    
+
     return {
       success: true,
       referrerId: referrer.id,
-      invitedUserId: userId
+      invitedUserId: userId,
     };
   } catch (error) {
     console.error('Error processing referral:', error);
     return {
       success: false,
-      error: 'Database error processing referral'
+      error: 'Database error processing referral',
     };
   }
 }
@@ -71,10 +75,10 @@ export async function processReferralCode(
 export async function getReferralCount(userId: string): Promise<number> {
   try {
     return await prisma.referral.count({
-      where: { referrerId: userId }
+      where: { referrerId: userId },
     });
   } catch (error) {
     console.error('Error counting referrals:', error);
     return 0;
   }
-} 
+}

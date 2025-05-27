@@ -55,9 +55,9 @@ export interface RestorationJob {
   /** User language code */
   language: string;
 
-    /** New properties for crease removal retry */
+  /** New properties for crease removal retry */
   isRetryWithoutCreases?: boolean;
-    /** Original photo path */
+  /** Original photo path */
   originalPhotoPath?: string;
 }
 

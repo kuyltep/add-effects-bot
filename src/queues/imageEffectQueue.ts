@@ -8,9 +8,11 @@ import { createRedisConnection } from '../utils/redis';
 export interface ImageEffectJobData {
   generationId: string;
   userId: string;
-  fileId: string;
+  fileId?: string;
   effect?: EffectType;
   logoEffect?: string;
+  bannerEffect?: string;
+  description?: string;
   chatId: string;
   messageId: number;
   language: string;
@@ -38,7 +40,7 @@ export const imageEffectQueue = new Queue<ImageEffectJobData>(QUEUE_NAME, {
 
 /**
  * Adds a job to the image effect generation queue.
- * 
+ *
  * @param data - The job data containing details for the image effect generation.
  * @returns The added job instance.
  */
@@ -68,4 +70,4 @@ process.on('SIGINT', async () => {
 process.on('SIGTERM', async () => {
   await imageEffectQueue.close();
   process.exit(0);
-}); 
+});

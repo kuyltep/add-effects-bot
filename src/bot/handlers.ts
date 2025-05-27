@@ -8,7 +8,6 @@ import { prisma } from '../utils/prisma';
 import { MyContext } from 'src/types/bot';
 import { checkChannelSubscriptionLogic } from './middleware/check-subscription';
 
-
 // Команда /start - начало работы с ботом
 export function setupStartCommand() {
   bot.start(async ctx => {
@@ -40,25 +39,25 @@ export function setupPackagesCommand() {
 // Команда /generate - генерация изображения
 export function setupGenerateCommand() {
   // Create a middleware function that can be reused
-  const generateMiddleware = async (ctx) => {
+  const generateMiddleware = async ctx => {
     try {
       // Get user info
       const telegramId = ctx.from?.id.toString() || '';
       const user = await findUserByTelegramId(telegramId);
-      
+
       if (!user) {
         await ctx.reply(ctx.i18n.t('bot:errors.not_registered'));
         return false;
       }
-      
+
       // Check if user can generate images
       const canGenerate = await canUserGenerate(ctx, user);
-      
+
       if (!canGenerate) {
         // The canUserGenerate function will already handle sending messages
         return false;
       }
-      
+
       // Enter the generate scene - welcome message will be sent by the scene itself
       await ctx.scene.enter('generate');
       return true;
@@ -71,7 +70,7 @@ export function setupGenerateCommand() {
 
   // Register the command
   bot.command('generate', generateMiddleware);
-  
+
   // Export the middleware for use elsewhere
   return generateMiddleware;
 }
@@ -106,50 +105,50 @@ export function setupHelpCommand() {
     await ctx.answerCbQuery();
     return ctx.scene.enter('links');
   });
-
-
 }
 
-async function videoHandler(ctx: MyContext, scene: "video" | "videoEffect") {
+async function videoHandler(ctx: MyContext, scene: 'video' | 'videoEffect') {
   try {
     // Get user info
     const telegramId = ctx.from?.id.toString() || '';
     const user = await findUserByTelegramId(telegramId);
-    
+
     if (!user) {
       await ctx.reply(ctx.i18n.t('bot:errors.not_registered'));
       return false;
     }
-    
+
     // Check if user has recent generations
     const lastGeneration = await prisma.generation.findFirst({
-      where: { 
+      where: {
         userId: user.id,
         status: GenerationStatus.COMPLETED,
         imageUrls: {
-          isEmpty: false
+          isEmpty: false,
         },
         model: {
-          not: "video"
-        }
+          not: 'video',
+        },
       },
-      orderBy: { 
-        createdAt: 'desc' 
-      }
+      orderBy: {
+        createdAt: 'desc',
+      },
     });
-    
+
     if (!lastGeneration) {
       return ctx.reply(ctx.i18n.t('bot:video.no_recent_generations'));
     }
-    
+
     // Get image paths from the last generation
-    const imagePaths = lastGeneration.imageUrls.filter(url => url.startsWith('https://') || fs.existsSync(url));
-    
+    const imagePaths = lastGeneration.imageUrls.filter(
+      url => url.startsWith('https://') || fs.existsSync(url)
+    );
+
     // Check if there are valid image paths
     if (!imagePaths || imagePaths.length === 0) {
       return ctx.reply(ctx.i18n.t('bot:video.no_images_found'));
     }
-    
+
     // Enter the video scene with the first image path
     await ctx.scene.enter(scene, { imagePath: imagePaths[0] });
     return true;
@@ -228,7 +227,7 @@ export function setupPackageCallbacks() {
   bot.action(/package_(package1|package2|package3|package4)/, async ctx => {
     await ctx.answerCbQuery();
     const packageType = ctx.match[1];
-    
+
     // Store the package type in scene state
     ctx.scene.state.packageType = packageType;
     return ctx.scene.enter('payment', { packageType });
@@ -239,9 +238,9 @@ export function setupPackageCallbacks() {
 export function setupGenerationCallbacks() {
   // Store reference to generate middleware
   const generateMiddleware = setupGenerateCommand();
-  
+
   // Generate more action
-  bot.action('generate_more', async (ctx) => {
+  bot.action('generate_more', async ctx => {
     try {
       // Answer callback query silently
       try {
@@ -249,10 +248,9 @@ export function setupGenerationCallbacks() {
       } catch (error) {
         console.error('Error answering callback query:', error);
       }
-      
+
       // Instead of manually checking user and permissions, reuse the generate middleware
       return generateMiddleware(ctx);
-      
     } catch (error) {
       console.error('Error in generate_more action:', error);
       // Send generic error message if possible
@@ -263,7 +261,7 @@ export function setupGenerationCallbacks() {
       }
     }
   });
-  
+
   // Invite friend action
   bot.action('invite_friend', async ctx => {
     try {
@@ -273,10 +271,9 @@ export function setupGenerationCallbacks() {
       } catch (error) {
         console.error('Error answering callback query:', error);
       }
-      
+
       // Enter referral scene
       return ctx.scene.enter('referral');
-      
     } catch (error) {
       console.error('Error in invite_friend action:', error);
       // Send generic error message if possible
@@ -307,43 +304,45 @@ async function upgradeHandler(ctx: MyContext) {
     // Get user info
     const telegramId = ctx.from?.id.toString() || '';
     const user = await findUserByTelegramId(telegramId);
-    
+
     if (!user) {
       await ctx.reply(ctx.i18n.t('bot:errors.not_registered'));
       return false;
     }
-    
+
     // Check if user has recent generations
     const lastGeneration = await prisma.generation.findFirst({
-      where: { 
+      where: {
         userId: user.id,
         status: GenerationStatus.COMPLETED,
         imageUrls: {
-          isEmpty: false
+          isEmpty: false,
         },
         model: {
           not: {
-            in: ["video", "upgrade"]
-          }
-        }
+            in: ['video', 'upgrade'],
+          },
+        },
       },
-      orderBy: { 
-        createdAt: 'desc' 
-      }
+      orderBy: {
+        createdAt: 'desc',
+      },
     });
-    
+
     if (!lastGeneration) {
       return ctx.reply(ctx.i18n.t('bot:upgrade.no_recent_generations'));
     }
-    
+
     // Get image paths from the last generation
-    const imagePaths = lastGeneration.imageUrls.filter(url => url.startsWith('https://') || fs.existsSync(url));
-    
+    const imagePaths = lastGeneration.imageUrls.filter(
+      url => url.startsWith('https://') || fs.existsSync(url)
+    );
+
     // Check if there are valid image paths
     if (!imagePaths || imagePaths.length === 0) {
       return ctx.reply(ctx.i18n.t('bot:upgrade.no_images_found'));
     }
-    
+
     // Enter the upgrade scene with the first image path
     await ctx.scene.enter('upgrade', { imagePath: imagePaths[0] });
     return true;

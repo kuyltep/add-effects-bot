@@ -58,7 +58,7 @@ export interface GenerateWizardState {
 /**
  * Type for scene names
  */
-export type SceneName = 
+export type SceneName =
   | 'start'
   | 'generate'
   | 'settings'
@@ -69,8 +69,8 @@ export type SceneName =
   | 'packages'
   | 'payment'
   | 'video'
-  | 'upgrade' 
-  | "supportMenu";
+  | 'upgrade'
+  | 'supportMenu';
 
 /**
  * Settings wizard state interface
@@ -104,14 +104,14 @@ export type EffectType =
   | 'claymation'
   | 'ghibli'
   | 'pixar'
-  | 'bratz'       // new
-  | 'cat'         // new
-  | 'dog'         // new
-  | 'sticker'     // new
-  | 'new_disney'  // new
-  | 'old_disney'  // new
-  | 'mitchells'   // new
-  | 'dreamworks'  // new
+  | 'bratz' // new
+  | 'cat' // new
+  | 'dog' // new
+  | 'sticker' // new
+  | 'new_disney' // new
+  | 'old_disney' // new
+  | 'mitchells' // new
+  | 'dreamworks' // new
   // FAL AI
   | 'plushify'
   | 'ghiblify'
@@ -129,4 +129,6 @@ export interface GenerationData {
   hasPhoto?: boolean;
   effect?: EffectType;
   logoEffect?: string; // For logo styling effects
-} 
+  bannerEffect?: string; // For banner styling effects
+  description?: string; // Text description for prompt
+}

@@ -9,14 +9,14 @@ const minimalI18nContext = {
     t: (key: string, options?: Record<string, any>) => {
       return i18next.t(key, { lng: 'en', ...options });
     },
-    locale: 'en'
+    locale: 'en',
   },
   ru: {
     t: (key: string, options?: Record<string, any>) => {
       return i18next.t(key, { lng: 'ru', ...options });
     },
-    locale: 'ru'
-  }
+    locale: 'ru',
+  },
 };
 
 // Language detection based on user settings or fallback to user language code
@@ -25,16 +25,16 @@ export const detectLanguage = async (ctx: MyContext): Promise<string> => {
   if (ctx.from?.id) {
     try {
       const telegramId = ctx.from.id.toString();
-      
+
       // Simplified query that uses less memory
-      const result = await prisma.$queryRaw<{language: string}[]>`
+      const result = await prisma.$queryRaw<{ language: string }[]>`
         SELECT us."language" 
         FROM "UserSettings" us
         JOIN "User" u ON us."userId" = u.id
         WHERE u."telegramId" = ${telegramId}
         LIMIT 1
       `;
-      
+
       // If we got results with language
       if (result && result.length > 0 && result[0].language) {
         const lang = result[0].language.toLowerCase();
@@ -45,12 +45,12 @@ export const detectLanguage = async (ctx: MyContext): Promise<string> => {
       console.error('Language detection DB error:', error.code || 'unknown');
     }
   }
-  
+
   // Fallback to language from Telegram client - but keep it minimal
   if (ctx.from?.language_code) {
     return ctx.from.language_code.startsWith('ru') ? 'ru' : 'en';
   }
-  
+
   // Default to English
   return 'en';
 };
@@ -66,10 +66,10 @@ export const i18nMiddleware = (): MiddlewareFn<MyContext> => async (ctx, next) =
   try {
     // Detect language
     const lang = await detectLanguage(ctx);
-    
+
     // Set context using our static references
     ctx.i18n = lang === 'ru' ? minimalI18nContext.ru : minimalI18nContext.en;
-    
+
     // Continue processing
     return next();
   } catch (error) {
@@ -78,4 +78,4 @@ export const i18nMiddleware = (): MiddlewareFn<MyContext> => async (ctx, next) =
     ctx.i18n = minimalI18nContext.en; // Default to English on error
     return next();
   }
-}; 
+};

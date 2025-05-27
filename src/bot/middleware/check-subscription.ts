@@ -1,6 +1,6 @@
-import { Markup } from "telegraf";
-import { MyContext } from "../types";
-import { prisma } from "../../utils/prisma";
+import { Markup } from 'telegraf';
+import { MyContext } from '../types';
+import { prisma } from '../../utils/prisma';
 
 export async function checkChannelSubscriptionLogic(
   ctx: MyContext,
@@ -12,7 +12,7 @@ export async function checkChannelSubscriptionLogic(
   // Get required channels from env
   const requiredChannels = (process.env.REQUIRED_CHANNELS || '').split(',').filter(Boolean);
   if (!requiredChannels.length) return true; // No channels configured
-  
+
   try {
     // Find the user record
     const user = await prisma.user.findUnique({ where: { telegramId: userId.toString() } });
@@ -20,15 +20,18 @@ export async function checkChannelSubscriptionLogic(
 
     // Check subscription status via Telegram API
     const subscriptionResults = [];
-    
+
     for (const channelId of requiredChannels) {
       try {
         // Format channel ID correctly for API call
         // For usernames: ensure they start with @
         // For numeric IDs: use as-is
-        const normalizedChannelId = channelId.startsWith('@') ? channelId : 
-                                   /^-?\d+$/.test(channelId) ? channelId : `@${channelId}`;
-        
+        const normalizedChannelId = channelId.startsWith('@')
+          ? channelId
+          : /^-?\d+$/.test(channelId)
+            ? channelId
+            : `@${channelId}`;
+
         const member = await ctx.telegram.getChatMember(normalizedChannelId, userId);
         const isSubscribed = ['creator', 'administrator', 'member'].includes(member.status);
         subscriptionResults.push({ channelId: normalizedChannelId, isSubscribed });
@@ -37,7 +40,7 @@ export async function checkChannelSubscriptionLogic(
         subscriptionResults.push({ channelId, isSubscribed: true });
       }
     }
-    
+
     // Determine if user is subscribed to all channels
     const isSubscribedToAll = subscriptionResults.every(result => result.isSubscribed);
 
@@ -46,7 +49,7 @@ export async function checkChannelSubscriptionLogic(
       // When user is subscribed to all channels
       const needsToUpdateSubscriptionStatus = !user.isSubscribed;
       const needsToGrantFreeGenerations = !user.freeGenerationsGranted;
-      
+
       if (needsToGrantFreeGenerations) {
         // Grant free generations only once
         await prisma.user.update({
@@ -59,12 +62,12 @@ export async function checkChannelSubscriptionLogic(
         // Notify user about granted generations
       } else if (needsToUpdateSubscriptionStatus) {
         // Just update subscription status if they were previously unsubscribed
-        await prisma.user.update({ 
-          where: { id: user.id }, 
-          data: { isSubscribed: true } 
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { isSubscribed: true },
         });
       }
-      
+
       // If triggered by button, confirm subscription
       if (isCallbackCheck) {
         await ctx.answerCbQuery(ctx.i18n.t('bot:subscription.all_subscribed_short'));
@@ -72,15 +75,15 @@ export async function checkChannelSubscriptionLogic(
           await ctx.deleteMessage(ctx.callbackQuery.message.message_id).catch(() => {});
         }
       }
-      
+
       return true; // User is subscribed
     } else {
       // User is not subscribed to all channels
       if (user.isSubscribed) {
         // Update DB if they were previously marked as subscribed
-        await prisma.user.update({ 
-          where: { id: user.id }, 
-          data: { isSubscribed: false } 
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { isSubscribed: false },
         });
       }
 
@@ -100,7 +103,6 @@ export async function checkChannelSubscriptionLogic(
       try {
         // If triggered by button, edit the existing message
         if (isCallbackCheck && ctx.callbackQuery?.message) {
-          
           // Always answer the callback query to provide feedback
           await ctx.answerCbQuery(ctx.i18n.t('bot:subscription.check_again_short'));
         } else if (!isCallbackCheck) {
@@ -134,24 +136,30 @@ export async function checkChannelSubscription(ctx: MyContext, next: () => Promi
   }
 
   // Handle the check_subscription callback query specifically
-  if (ctx.callbackQuery && 'data' in ctx.callbackQuery && ctx.callbackQuery.data === 'check_subscription') {
-     try {
-       // First answer the callback query to prevent the spinner
-       await ctx.answerCbQuery(undefined, { cache_time: 0 });
-       
-       // Then check the subscription status with isCallbackCheck=true
-       await checkChannelSubscriptionLogic(ctx, true);
-     } catch (error) {
-       console.error('Error handling check_subscription callback:', error);
-       
-       // Try to give feedback to the user
-       try {
-         await ctx.answerCbQuery(ctx.i18n.t('bot:subscription.error_checking') || 'Error checking subscription status');
-       } catch (answerError) {
-         console.error('Failed to answer callback query:', answerError);
-       }
-     }
-     return; // Don't call next() because we handled the action
+  if (
+    ctx.callbackQuery &&
+    'data' in ctx.callbackQuery &&
+    ctx.callbackQuery.data === 'check_subscription'
+  ) {
+    try {
+      // First answer the callback query to prevent the spinner
+      await ctx.answerCbQuery(undefined, { cache_time: 0 });
+
+      // Then check the subscription status with isCallbackCheck=true
+      await checkChannelSubscriptionLogic(ctx, true);
+    } catch (error) {
+      console.error('Error handling check_subscription callback:', error);
+
+      // Try to give feedback to the user
+      try {
+        await ctx.answerCbQuery(
+          ctx.i18n.t('bot:subscription.error_checking') || 'Error checking subscription status'
+        );
+      } catch (answerError) {
+        console.error('Failed to answer callback query:', answerError);
+      }
+    }
+    return; // Don't call next() because we handled the action
   }
 
   // Always check subscription status on each command or action

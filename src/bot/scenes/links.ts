@@ -6,7 +6,7 @@ import { MyContext } from '../types';
 export const linksScene = new Scenes.BaseScene<MyContext>('links');
 
 // Scene enter handler
-linksScene.enter(async (ctx) => {
+linksScene.enter(async ctx => {
   try {
     // Display links information
     await ctx.reply(ctx.i18n.t('bot:links.info'), {
@@ -25,7 +25,7 @@ linksScene.enter(async (ctx) => {
 });
 
 // Handle /cancel command
-linksScene.command('cancel', async (ctx) => {
+linksScene.command('cancel', async ctx => {
   await ctx.reply(ctx.i18n.t('bot:errors.cancelled'));
   return ctx.scene.leave();
-}); 
+});

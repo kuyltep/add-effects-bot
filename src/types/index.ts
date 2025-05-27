@@ -11,4 +11,4 @@ export * from './common.type';
 export * from './generation';
 
 // Utility types
-export * from './utility'; 
+export * from './utility';

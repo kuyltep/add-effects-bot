@@ -73,4 +73,4 @@ export async function getVideoJobStatus(jobId: string): Promise<string | null> {
   return state;
 }
 
-export default videoQueue; 
+export default videoQueue;

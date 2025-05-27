@@ -6,22 +6,22 @@ import fs from 'fs';
 function loadTranslations() {
   const languages = ['ru'];
   const resources = {};
-  
+
   languages.forEach(lang => {
     try {
       const filePath = path.resolve(__dirname, `locales/${lang}/translation.json`);
       const fileContents = fs.readFileSync(filePath, 'utf8');
       const translations = JSON.parse(fileContents);
-      
+
       resources[lang] = {
         translation: translations,
-        bot: translations.bot // Add bot namespace for 'bot:' prefixed keys
+        bot: translations.bot, // Add bot namespace for 'bot:' prefixed keys
       };
     } catch (error) {
       console.error(`Error loading translations for ${lang}:`, error);
     }
   });
-  
+
   return resources;
 }
 

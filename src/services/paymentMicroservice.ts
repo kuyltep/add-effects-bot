@@ -9,8 +9,8 @@ export interface MSProduct {
   generations: number;
   currency?: string;
   botName: string;
-  paymentId: string;    // ID of the payment record on the microservice
-  paymentLink: string;  // Direct payment link for this product
+  paymentId: string; // ID of the payment record on the microservice
+  paymentLink: string; // Direct payment link for this product
 }
 
 const getPaymentServiceUrl = () => {
@@ -40,27 +40,34 @@ export async function getProductsFromMS(botName: string): Promise<MSProduct[]> {
     });
     return response.data;
   } catch (error) {
-
     throw error; // Re-throw to be handled by the caller
   }
 }
 
-
-export async function updatePaymentOnMS(paymentId: string, updateData: {userId?: string, username?: string, amount?: number, status?: string, generationsAdded?: number, productId?: string}): Promise<any> {
+export async function updatePaymentOnMS(
+  paymentId: string,
+  updateData: {
+    userId?: string;
+    username?: string;
+    amount?: number;
+    status?: string;
+    generationsAdded?: number;
+    productId?: string;
+  }
+): Promise<any> {
   const baseUrl = getPaymentServiceUrl();
   const apiKey = getPaymentServiceApiKey();
   const updateUrl = `${baseUrl}/api/payments/${paymentId}`;
 
   try {
     const response = await axios.patch(updateUrl, updateData, {
-      headers: { 
+      headers: {
         'x-api-key': apiKey,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
     });
     return response.data;
   } catch (error) {
-  
     throw error; // Re-throw to be handled by the caller
   }
-} 
+}

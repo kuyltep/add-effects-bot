@@ -15,16 +15,16 @@ async function fetchUserData(telegramId: string): Promise<{
   referralCount: number;
 } | null> {
   const user = await findUserByTelegramId(telegramId);
-  
+
   if (!user) {
     return null;
   }
-  
+
   // Get referral count in a single query
   const referralCount = await prisma.referral.count({
     where: { referrerId: user.id },
   });
-  
+
   return { user, referralCount };
 }
 
@@ -33,17 +33,11 @@ async function fetchUserData(telegramId: string): Promise<{
  */
 function createBalanceKeyboard(ctx: MyContext): any {
   const buttons = [
-    [
-      Markup.button.callback(ctx.i18n.t('bot:buttons.invite_friend'), 'invite_friend'),
-    ],
-    [
-      Markup.button.callback(ctx.i18n.t('bot:buttons.buy_generations'), 'buy_generations'),
-    ],
-    [
-      Markup.button.callback(ctx.i18n.t('bot:keyboard.support_menu'), 'support_menu'),
-    ]
+    [Markup.button.callback(ctx.i18n.t('bot:buttons.invite_friend'), 'invite_friend')],
+    [Markup.button.callback(ctx.i18n.t('bot:buttons.buy_generations'), 'buy_generations')],
+    [Markup.button.callback(ctx.i18n.t('bot:keyboard.support_menu'), 'support_menu')],
   ];
-  
+
   return Markup.inlineKeyboard(buttons).reply_markup;
 }
 
@@ -53,55 +47,47 @@ function createBalanceKeyboard(ctx: MyContext): any {
 async function displayBalanceInfo(ctx: MyContext): Promise<any> {
   const telegramId = ctx.from?.id.toString() || '';
   const userData = await fetchUserData(telegramId);
-  
+
   if (!userData) {
     await ctx.reply(ctx.i18n.t('bot:errors.not_registered'), {
       parse_mode: 'HTML',
     });
     return ctx.scene.leave();
   }
-  
+
   const { user, referralCount } = userData;
-  
+
   const balanceText = ctx.i18n.t('bot:balance.info', {
     remainingGenerations: user.remainingGenerations,
     referrals: referralCount,
   });
-  
-  await ctx.reply(
-    balanceText,
-    {
-      parse_mode: 'HTML',
-      reply_markup: createBalanceKeyboard(ctx),
-    }
-  );
-  
+
+  await ctx.reply(balanceText, {
+    parse_mode: 'HTML',
+    reply_markup: createBalanceKeyboard(ctx),
+  });
+
   // Auto leave the scene after displaying balance
   return ctx.scene.leave();
 }
 
 // Scene enter handler
-accountScene.enter(async (ctx) => {
+accountScene.enter(async ctx => {
   return await displayBalanceInfo(ctx);
 });
 
 // Handle callback actions
-accountScene.action('buy_generations', async (ctx) => {
+accountScene.action('buy_generations', async ctx => {
   await ctx.answerCbQuery();
   return transitionToScene(ctx, 'packages');
 });
 
-
-accountScene.action('invite_friend', async (ctx) => {
+accountScene.action('invite_friend', async ctx => {
   await ctx.answerCbQuery();
   return transitionToScene(ctx, 'referral');
 });
 
-
-
 // Handle /cancel command
-accountScene.command('cancel', async (ctx) => {
+accountScene.command('cancel', async ctx => {
   return exitScene(ctx, 'bot:errors.cancelled');
-}); 
-
-
+});

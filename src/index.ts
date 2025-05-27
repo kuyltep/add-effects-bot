@@ -10,7 +10,7 @@ import middleware from 'i18next-http-middleware';
 import config from './config';
 import { setupCleanupTask } from './services/cleanup';
 import { launchWorkers, stopWorkers } from './workers';
-import {fastifyFormbody} from '@fastify/formbody';
+import { fastifyFormbody } from '@fastify/formbody';
 // Import routes
 import authRoutes from './routes/auth';
 import generationRoutes from './routes/generation';
@@ -43,7 +43,7 @@ function createServer(): FastifyInstance {
 
   // Register CORS plugin
   server.register(cors, {
-    origin: "*",
+    origin: '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   });
 
@@ -81,7 +81,7 @@ function registerRoutes(server: FastifyInstance) {
   server.register(referralRoutes, { prefix: '/api/referrals' });
   server.register(paymentRoutes, { prefix: '/api/payments' });
   server.register(adminRoutes, { prefix: '/api/admin' });
-  
+
   // Register admin panel routes - instead of registering the same routes twice,
   // we'll use a setNotFoundHandler to serve the admin SPA for all /admin routes
   server.register(botRoutes, { prefix: '/api/bot' });
@@ -111,14 +111,14 @@ function registerRoutes(server: FastifyInstance) {
         const indexPath = path.join(adminDistPath, 'index.html');
         // Проверяем существует ли файл
         if (!fs.existsSync(indexPath)) {
-          Logger.error(
-            new Error(`Admin index.html not found at ${indexPath}`), 
-            { context: 'NotFoundHandler', path: req.raw.url }
-          );
+          Logger.error(new Error(`Admin index.html not found at ${indexPath}`), {
+            context: 'NotFoundHandler',
+            path: req.raw.url,
+          });
           reply.code(404).send('Admin panel not found. Did you build the admin frontend?');
           return;
         }
-        
+
         // Читаем файл вручную
         fs.readFile(indexPath, (err, fileBuffer) => {
           if (err) {
@@ -159,17 +159,17 @@ async function initializeBot() {
  */
 async function startServer(server: FastifyInstance, port: number) {
   try {
-    await server.listen({ 
-      port, 
-      host: '0.0.0.0'
+    await server.listen({
+      port,
+      host: '0.0.0.0',
     });
-    
+
     // Log explicit server address
     const serverAddress = server.server.address();
     if (serverAddress && typeof serverAddress !== 'string') {
       console.log(`Server address details: ${serverAddress.address}:${serverAddress.port}`);
     }
-    
+
     serviceState.server = server;
 
     return true;
@@ -200,10 +200,10 @@ function initializeCleanupTasks() {
 async function initializeWorkers() {
   try {
     console.log('Initializing workers in separate threads...');
-    
+
     // Launch workers manager
     launchWorkers();
-    
+
     serviceState.workersInitialized = true;
     console.log('Workers initialized successfully in separate threads');
     return true;
@@ -218,16 +218,16 @@ async function initializeWorkers() {
  */
 async function shutdownServices() {
   let shutdownSuccessful = true;
-  
+
   console.log('Gracefully shutting down services...');
-  
+
   // Stop the bot health check if it exists
   if (serviceState.botHealthCheckInterval) {
     clearInterval(serviceState.botHealthCheckInterval);
     serviceState.botHealthCheckInterval = null;
     console.log('Bot health check stopped');
   }
-  
+
   // Stop the cleanup task if it exists
   if (serviceState.cleanupTask) {
     try {
@@ -238,7 +238,7 @@ async function shutdownServices() {
       shutdownSuccessful = false;
     }
   }
-  
+
   // Stop the bot if it was started
   if (serviceState.botStarted) {
     try {
@@ -249,7 +249,7 @@ async function shutdownServices() {
       shutdownSuccessful = false;
     }
   }
-  
+
   // Stop workers if they were initialized
   if (serviceState.workersInitialized) {
     try {
@@ -265,7 +265,7 @@ async function shutdownServices() {
       shutdownSuccessful = false;
     }
   }
-  
+
   // Close the server
   if (serviceState.server) {
     try {
@@ -276,14 +276,14 @@ async function shutdownServices() {
       shutdownSuccessful = false;
     }
   }
-  
+
   if (shutdownSuccessful) {
     console.log('All services shut down successfully');
   } else {
     Logger.warn('Some services encountered errors during shutdown');
     console.warn('Some services encountered errors during shutdown');
   }
-  
+
   return shutdownSuccessful;
 }
 
@@ -294,13 +294,13 @@ function registerSignalHandlers() {
   // Use once to ensure handlers are only registered once
   process.once('SIGINT', shutdownServices);
   process.once('SIGTERM', shutdownServices);
-  
+
   // Handle uncaught exceptions and unhandled rejections
-  process.on('uncaughtException', (error) => {
+  process.on('uncaughtException', error => {
     Logger.critical('Uncaught exception:', error);
     shutdownServices();
   });
-  
+
   process.on('unhandledRejection', (reason, promise) => {
     Logger.critical('Unhandled rejection at:', promise);
     shutdownServices();
@@ -312,44 +312,42 @@ function registerSignalHandlers() {
  */
 async function startApplication() {
   try {
-    
     // Create and configure the server
     const server = createServer();
-    
+
     // Register routes
     registerRoutes(server);
-    
+
     // Start the server
     const port = parseInt(process.env.PORT || '3000', 10);
     const serverStarted = await startServer(server, port);
-    
+
     if (!serverStarted) {
       Logger.critical('Server failed to start, exiting application');
       process.exit(1);
     }
-    
+
     console.log(`Server started successfully on port ${port}`);
     const workersStarted = await initializeWorkers();
 
     initializeCleanupTasks();
-    
+
     // Register signal handlers for graceful shutdown
     registerSignalHandlers();
-    
+
     // Initialize the Telegram bot
-    
+
     // Setup bot health check
-    
+
     const botStarted = await initializeBot();
     if (!botStarted) {
       console.warn('Bot failed to start, but continuing with other services');
     }
 
-    
     if (!workersStarted) {
       console.warn('Workers failed to initialize, job processing may not work correctly');
     }
-    
+
     return true;
   } catch (error) {
     Logger.critical('Failed to start application:', error);

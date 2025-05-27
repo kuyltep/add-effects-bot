@@ -15,6 +15,9 @@ export interface GenerationData {
   height: number;
   batchSize: number;
   model: string;
+  logoEffect?: string;
+  bannerEffect?: string;
+  description?: string;
   // Дополнительные поля для регистрации
   email?: string;
   password?: string;

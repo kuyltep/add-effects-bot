@@ -110,7 +110,7 @@ export const videoConfig = {
     jesus: 'Warmth of Jesus',
     microwave: 'Microwave',
   },
-}
+};
 
 export default {
   server: serverConfig,

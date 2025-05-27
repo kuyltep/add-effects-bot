@@ -71,10 +71,10 @@ export async function translatePrompt(text: string): Promise<string> {
 
     return translation;
   } catch (error) {
-    Logger.error(error, { 
-      context: 'language-service', 
+    Logger.error(error, {
+      context: 'language-service',
       method: 'translatePrompt',
-      textLength: text.length
+      textLength: text.length,
     });
     throw new Error(
       `Translation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -124,10 +124,10 @@ export async function translateToEnglish(text: string, sourceLanguage?: string):
     // Return the translated text
     return response.choices[0].message.content?.trim() || text;
   } catch (error) {
-    Logger.error(error, { 
-      context: 'language-service', 
+    Logger.error(error, {
+      context: 'language-service',
       method: 'translateToEnglish',
-      sourceLanguage
+      sourceLanguage,
     });
     // Return original text in case of error
     return text;

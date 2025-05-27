@@ -14,7 +14,7 @@ const MAIN_KEYBOARD_MAPPING = {
   '👤 Аккаунт': 'account',
   '✨ Помощь': 'supportMenu',
   '⚙️ Настройки': 'settings',
-  
+
   // English buttons
   '✨ Generate': 'generate',
   '🏦 Balance': 'balance',
@@ -25,8 +25,8 @@ const MAIN_KEYBOARD_MAPPING = {
 };
 
 /**
- * Create a stage-level middleware to handle main keyboard buttons globally 
- * 
+ * Create a stage-level middleware to handle main keyboard buttons globally
+ *
  * This is designed to be registered at the stage level (not scene level)
  * to avoid infinite loops when transitioning between scenes.
  */
@@ -42,15 +42,14 @@ export function createMainKeyboardMiddleware(): Middleware<MyContext> {
 
     // If this is a main keyboard button
     if (targetScene) {
-      
       // If we're in a scene
       if (ctx.scene?.current) {
         const currentSceneId = ctx.scene.current.id;
-        
+
         if (currentSceneId === targetScene) {
           return next();
         }
-        
+
         try {
           // Force leave current scene and enter target scene
           await ctx.scene.leave();
@@ -59,7 +58,7 @@ export function createMainKeyboardMiddleware(): Middleware<MyContext> {
           Logger.error(`Error transitioning scenes: ${error.message}`, {
             from: currentSceneId,
             to: targetScene,
-            userId: ctx.from?.id
+            userId: ctx.from?.id,
           });
           // Try to recover by force leaving and entering
           await ctx.scene.leave();
@@ -74,4 +73,4 @@ export function createMainKeyboardMiddleware(): Middleware<MyContext> {
     // Continue normal processing for non-keyboard messages or when not in a scene
     return next();
   };
-} 
+}

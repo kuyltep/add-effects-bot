@@ -1,4 +1,9 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+  GetObjectCommand,
+} from '@aws-sdk/client-s3';
 import fs from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
@@ -41,7 +46,7 @@ class S3Storage {
       });
 
       await this.client.send(command);
-      
+
       // Generate URL for the uploaded file
       return `https://${this.bucketName}.storage.yandexcloud.net/${fileName}`;
     } catch (error) {
@@ -58,7 +63,7 @@ class S3Storage {
     try {
       // Extract the file key from the URL
       const fileName = fileUrl.split('/').pop();
-      
+
       if (!fileName) {
         throw new Error('Invalid file URL');
       }
@@ -108,4 +113,4 @@ const s3Config: S3StorageConfig = {
 
 const s3Storage = new S3Storage(s3Config);
 
-export { s3Storage }; 
+export { s3Storage };

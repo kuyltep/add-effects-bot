@@ -17,34 +17,34 @@ export const botErrorHandler = (): MiddlewareFn<MyContext> => async (ctx, next) 
       chatId: ctx.chat?.id,
       userId: ctx.from?.id,
       username: ctx.from?.username,
-      messageText: ('text' in ctx.message) ? ctx.message.text : undefined,
+      messageText: 'text' in ctx.message ? ctx.message.text : undefined,
       scene: ctx.scene?.current?.id,
     };
-    
+
     // Log the error to Rollbar with context
     Logger.error(error instanceof Error ? error : new Error(String(error)), errorContext);
-    
+
     // Send a user-friendly message
     try {
       let errorMessage = 'An error occurred while processing your request.';
-      
+
       // Use i18n if available
       if (ctx.i18n) {
         errorMessage = ctx.i18n.t('bot:errors.general');
       }
-      
+
       await ctx.reply(errorMessage, { parse_mode: 'HTML' });
-      
+
       // If in a scene, leave it to avoid stuck states
       if (ctx.scene?.current) {
         await ctx.scene.leave();
       }
     } catch (replyError) {
       // If reply fails, log this additional error
-      Logger.error(
-        replyError instanceof Error ? replyError : new Error(String(replyError)), 
-        { ...errorContext, context: 'Failed to send error message' }
-      );
+      Logger.error(replyError instanceof Error ? replyError : new Error(String(replyError)), {
+        ...errorContext,
+        context: 'Failed to send error message',
+      });
     }
   }
-}; 
+};

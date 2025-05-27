@@ -1,4 +1,4 @@
-import { Resolution, Language } from "@prisma/client";
+import { Resolution, Language } from '@prisma/client';
 
 /**
  * Interface for user settings
@@ -20,4 +20,4 @@ export interface SettingsUpdateData {
   resolution?: Resolution;
   /** User language preference */
   language?: string;
-} 
+}

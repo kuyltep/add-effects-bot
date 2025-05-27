@@ -39,4 +39,4 @@ export interface MyContext extends Context {
   i18n: I18nContext;
   /** Prisma database client */
   prisma: PrismaClient;
-} 
+}

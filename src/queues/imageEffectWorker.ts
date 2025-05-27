@@ -10,7 +10,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { createRedisConnection, createRedisPublisher } from '../utils/redis';
 import { applyImageEffect } from '../services/fal-ai';
 import { isMainThread, parentPort, workerData } from 'worker_threads';
-import { editImageOpenAI } from '../services/openai';
+import { createImageOpenAI, editImageOpenAI } from '../services/openai';
 
 // Constants
 const QUEUE_NAME = 'image-effect-generation';
@@ -18,7 +18,19 @@ const UPLOAD_DIR = config.server.uploadDir;
 const SUPPORT_USERNAME = process.env.TELEGRAM_SUPPORT_USERNAME || 'support';
 
 // Group effects by processing service
-const OPENAI_EFFECTS = ['claymation', 'ghibli', 'pixar', 'bratz', 'cat', 'dog', 'sticker', 'new_disney', 'old_disney', 'mitchells', 'dreamworks'];
+const OPENAI_EFFECTS = [
+  'claymation',
+  'ghibli',
+  'pixar',
+  'bratz',
+  'cat',
+  'dog',
+  'sticker',
+  'new_disney',
+  'old_disney',
+  'mitchells',
+  'dreamworks',
+];
 const FAL_AI_EFFECTS = ['plushify', 'ghiblify', 'cartoonify'];
 
 // Initialize resources
@@ -37,26 +49,28 @@ function initializeRedisConnections() {
 // i18n translations for effect worker
 const translations = {
   en: {
-    processing: "🔄 Processing image...",
-    applying_effect: "🎨 Applying {{effect}} effect...",
-    openai_processing: "✨ Adding final touches with AI...",
+    processing: '🔄 Processing image...',
+    applying_effect: '🎨 Applying {{effect}} effect...',
+    openai_processing: '✨ Adding final touches with AI...',
     effect_applied: "✅ Effect '{{effect}}' applied!",
-    error_applying: "❌ Error applying effect '{{effect}}'. Please try again or contact @{{supportUsername}}."
+    error_applying:
+      "❌ Error applying effect '{{effect}}'. Please try again or contact @{{supportUsername}}.",
   },
   ru: {
-    processing: "🔄 Обработка изображения...",
-    applying_effect: "🎨 Применение эффекта {{effect}}...",
-    openai_processing: "✨ Добавление финальных штрихов с ИИ...",
+    processing: '🔄 Обработка изображения...',
+    applying_effect: '🎨 Применение эффекта {{effect}}...',
+    openai_processing: '✨ Добавление финальных штрихов с ИИ...',
     effect_applied: "✅ Эффект '{{effect}}' применен!",
-    error_applying: "❌ Ошибка при применении эффекта '{{effect}}'. Пожалуйста, попробуйте еще раз или свяжитесь с @{{supportUsername}}."
-  }
+    error_applying:
+      "❌ Ошибка при применении эффекта '{{effect}}'. Пожалуйста, попробуйте еще раз или свяжитесь с @{{supportUsername}}.",
+  },
 };
 
 // Get localized message
 function getMessage(key: string, language: string, params: Record<string, any> = {}): string {
   const lang = language === 'ru' ? 'ru' : 'en';
   const message = translations[lang][key];
-  
+
   if (!message) return key;
 
   return Object.entries(params).reduce(
@@ -71,220 +85,294 @@ function getMessage(key: string, language: string, params: Record<string, any> =
  * @returns The local path where the file was downloaded.
  */
 async function downloadTelegramFile(fileId: string): Promise<string> {
-    // Create a unique filename for the download
-    const tempDir = path.join(UPLOAD_DIR, 'temp');
-    await fs.mkdir(tempDir, { recursive: true });
-    const filePath = path.join(tempDir, `${uuidv4()}-${fileId}.jpg`);
-    
-    // Ensure Redis connections are initialized
-    initializeRedisConnections();
-    
-    // Request the bot to download the file via Redis
-    await redisPublisher.publish('bot:download_file', JSON.stringify({
-        fileId,
-        downloadPath: filePath
-    }));
-    
-    // Wait for the file to be downloaded
-    const maxWaitTime = 25000; // 25 seconds
-    const checkInterval = 3000; // 3 seconds
-    let waitedTime = 0;
-    
-    while (waitedTime < maxWaitTime) {
-        await new Promise(resolve => setTimeout(resolve, checkInterval));
-        waitedTime += checkInterval;
-        
-        try {
-            const stats = await fs.stat(filePath);
-            if (stats.size > 0) {
-                return filePath;
-            }
-        } catch (error) {
-            // File doesn't exist yet or error checking, continue waiting
-        }
+  // Create a unique filename for the download
+  const tempDir = path.join(UPLOAD_DIR, 'temp');
+  await fs.mkdir(tempDir, { recursive: true });
+  const filePath = path.join(tempDir, `${uuidv4()}-${fileId}.jpg`);
+
+  // Ensure Redis connections are initialized
+  initializeRedisConnections();
+
+  // Request the bot to download the file via Redis
+  await redisPublisher.publish(
+    'bot:download_file',
+    JSON.stringify({
+      fileId,
+      downloadPath: filePath,
+    })
+  );
+
+  // Wait for the file to be downloaded
+  const maxWaitTime = 25000; // 25 seconds
+  const checkInterval = 3000; // 3 seconds
+  let waitedTime = 0;
+
+  while (waitedTime < maxWaitTime) {
+    await new Promise(resolve => setTimeout(resolve, checkInterval));
+    waitedTime += checkInterval;
+
+    try {
+      const stats = await fs.stat(filePath);
+      if (stats.size > 0) {
+        return filePath;
+      }
+    } catch (error) {
+      // File doesn't exist yet or error checking, continue waiting
     }
-    
-    throw new Error(`Timed out after ${maxWaitTime}ms waiting for file download`);
+  }
+
+  throw new Error(`Timed out after ${maxWaitTime}ms waiting for file download`);
 }
 /**
  * Processes an image effect generation job.
  */
 async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void> {
-    const { generationId, userId, fileId, effect, chatId, messageId, language, resolution = 'SQUARE', logoEffect } = job.data;
+  const {
+    generationId,
+    userId,
+    fileId,
+    effect,
+    chatId,
+    messageId,
+    language,
+    resolution = 'SQUARE',
+    logoEffect,
+    description,
+    bannerEffect,
+  } = job.data;
 
-    let localFilePath: string | null = null;
-    let finalOutputPath: string | null = null;
+  let localFilePath: string | null = null;
+  let finalOutputPath: string | null = null;
 
-    try {
-        // Ensure Redis connections are initialized
-        initializeRedisConnections();
-        
-        // 1. Update status to PROCESSING
-        await prisma.generation.update({ 
-            where: { id: generationId }, 
-            data: { status: GenerationStatus.PROCESSING }
-        });
-        
-        await redisPublisher.publish('bot:status_update', JSON.stringify({ 
-            chatId, 
-            messageId, 
-            text: getMessage('processing', language) 
-        }));
+  try {
+    // Ensure Redis connections are initialized
+    initializeRedisConnections();
 
-        // 2. Download the original image from Telegram via bot core
-        localFilePath = await downloadTelegramFile(fileId);
+    // 1. Update status to PROCESSING
+    await prisma.generation.update({
+      where: { id: generationId },
+      data: { status: GenerationStatus.PROCESSING },
+    });
 
-        // 3. Apply effect based on type
-        await redisPublisher.publish('bot:status_update', JSON.stringify({ 
-            chatId, 
-            messageId, 
-            text: getMessage('applying_effect', language, { effect: effect || logoEffect }) 
-        }));
-        
-        if (FAL_AI_EFFECTS.includes(effect)) {
-            // Process with FAL AI
-            finalOutputPath = await applyImageEffect(localFilePath, effect, resolution as Resolution);
-        } else if (OPENAI_EFFECTS.includes(effect)) {
-            // Pass the resolution to OpenAI service
-            finalOutputPath = await editImageOpenAI(localFilePath, effect, resolution as Resolution, job.data.logoEffect);
-        } else if (job.data.logoEffect) {
-            // Process logo effects
-            finalOutputPath = await editImageOpenAI(localFilePath, null, resolution as Resolution, job.data.logoEffect);
-        } else {
-            throw new Error(`Unsupported effect type: ${effect}`);
-        }
+    await redisPublisher.publish(
+      'bot:status_update',
+      JSON.stringify({
+        chatId,
+        messageId,
+        text: getMessage('processing', language),
+      })
+    );
 
-        // 4. Save the final image to the user's directory
-        const outputDir = path.join(UPLOAD_DIR, userId, generationId);
-        await fs.mkdir(outputDir, { recursive: true });
-        
-        // 5. Copy the final image to the user's directory if needed
-        if (finalOutputPath !== path.join(outputDir, "final_effect_image.jpg")) {
-            const userFilePath = path.join(outputDir, "final_effect_image.jpg");
-            const fileContent = await fs.readFile(finalOutputPath);
-            await fs.writeFile(userFilePath, fileContent);
-            finalOutputPath = userFilePath;
-        }
-        
-        // 6. Decrement user generations (atomic operation)
-        const updatedUser = await prisma.user.update({ 
-            where: { id: userId }, 
-            data: { remainingGenerations: { decrement: 1 } } 
-        });
-
-        // 7. Update Generation record to COMPLETED
-        await prisma.generation.update({ 
-            where: { id: generationId }, 
-            data: { 
-                status: GenerationStatus.COMPLETED, 
-                imageUrls: [finalOutputPath]
-            }
-        });
-
-        // 8. Notify user via Redis with the effect results
-        await redisPublisher.publish('bot:send_effect', JSON.stringify({
-            chatId,
-            imageData: {
-                path: finalOutputPath,
-                isUrl: false
-            },
-            userId,
-            referralCode: updatedUser?.referralCode || "",
-            language,
-            generationId,
-            effect
-        }));
-
-    } catch (error) {
-        Logger.error(`Job ${job.id} failed for generation ${generationId}`, { error, effect, userId });
-        
-        // Update status to FAILED
-        await prisma.generation.update({
-            where: { id: generationId }, 
-            data: { status: GenerationStatus.FAILED, error: error.message }
-        }).catch(updateErr => Logger.error('Failed to update generation status to FAILED', { updateErr }));
-        
-        // Ensure Redis connections are initialized
-        initializeRedisConnections();
-        
-        // Notify user of failure via Redis
-        await redisPublisher.publish('bot:status_update', JSON.stringify({
-            chatId,
-            messageId,
-            text: getMessage('error_applying', language, { effect, supportUsername: SUPPORT_USERNAME })
-        })).catch(pubErr => Logger.error('Failed to publish error status update', { pubErr }));
-        
-        // Re-throw the error so BullMQ marks the job as failed
-        throw error;
-    } finally {
-        try {
-            // Clean up temporary downloaded file
-            if (localFilePath) {
-                await fs.unlink(localFilePath).catch(unlinkErr => Logger.warn(`Failed to delete temp file ${localFilePath}`, { unlinkErr }));
-            }
-        } catch (cleanupError) {
-            Logger.warn('Error during cleanup', { cleanupError });
-        }
+    // 2. Download the original image from Telegram via bot core or create
+    if (fileId) {
+      localFilePath = await downloadTelegramFile(fileId);
+    } else {
+      localFilePath = path.join(UPLOAD_DIR, 'temp');
     }
+
+    // 3. Apply effect based on type
+    await redisPublisher.publish(
+      'bot:status_update',
+      JSON.stringify({
+        chatId,
+        messageId,
+        text: getMessage('applying_effect', language, {
+          effect: effect || logoEffect || bannerEffect,
+        }),
+      })
+    );
+
+    // Generate image with OpenAI service
+    if (!fileId) {
+      finalOutputPath = await createImageOpenAI(
+        localFilePath,
+        effect,
+        resolution as Resolution,
+        logoEffect,
+        bannerEffect,
+        description
+      );
+    } else if (FAL_AI_EFFECTS.includes(effect)) {
+      // Process with FAL AI
+      finalOutputPath = await applyImageEffect(localFilePath, effect, resolution as Resolution);
+    } else if (OPENAI_EFFECTS.includes(effect)) {
+      // Pass the resolution to OpenAI service
+      finalOutputPath = await editImageOpenAI(
+        localFilePath,
+        effect,
+        resolution as Resolution,
+        job.data.logoEffect
+      );
+    } else if (job.data.logoEffect) {
+      // Process logo effects
+      finalOutputPath = await editImageOpenAI(
+        localFilePath,
+        null,
+        resolution as Resolution,
+        job.data.logoEffect
+      );
+    } else if (job.data.bannerEffect) {
+      // Process logo effects
+      finalOutputPath = await editImageOpenAI(
+        localFilePath,
+        null,
+        resolution as Resolution,
+        undefined,
+        job.data.bannerEffect,
+        description
+      );
+    } else {
+      throw new Error(`Unsupported effect type: ${effect}`);
+    }
+
+    // 4. Save the final image to the user's directory
+    const outputDir = path.join(UPLOAD_DIR, userId, generationId);
+    await fs.mkdir(outputDir, { recursive: true });
+
+    // 5. Copy the final image to the user's directory if needed
+    if (finalOutputPath !== path.join(outputDir, 'final_effect_image.jpg')) {
+      const userFilePath = path.join(outputDir, 'final_effect_image.jpg');
+      const fileContent = await fs.readFile(finalOutputPath);
+      await fs.writeFile(userFilePath, fileContent);
+      finalOutputPath = userFilePath;
+    }
+
+    // 6. Decrement user generations (atomic operation)
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { remainingGenerations: { decrement: 1 } },
+    });
+
+    // 7. Update Generation record to COMPLETED
+    await prisma.generation.update({
+      where: { id: generationId },
+      data: {
+        status: GenerationStatus.COMPLETED,
+        imageUrls: [finalOutputPath],
+      },
+    });
+
+    // 8. Notify user via Redis with the effect results
+    await redisPublisher.publish(
+      'bot:send_effect',
+      JSON.stringify({
+        chatId,
+        imageData: {
+          path: finalOutputPath,
+          isUrl: false,
+        },
+        userId,
+        referralCode: updatedUser?.referralCode || '',
+        language,
+        generationId,
+        effect,
+      })
+    );
+  } catch (error) {
+    Logger.error(`Job ${job.id} failed for generation ${generationId}`, { error, effect, userId });
+
+    // Update status to FAILED
+    await prisma.generation
+      .update({
+        where: { id: generationId },
+        data: { status: GenerationStatus.FAILED, error: error.message },
+      })
+      .catch(updateErr =>
+        Logger.error('Failed to update generation status to FAILED', { updateErr })
+      );
+
+    // Ensure Redis connections are initialized
+    initializeRedisConnections();
+
+    // Notify user of failure via Redis
+    await redisPublisher
+      .publish(
+        'bot:status_update',
+        JSON.stringify({
+          chatId,
+          messageId,
+          text: getMessage('error_applying', language, {
+            effect,
+            supportUsername: SUPPORT_USERNAME,
+          }),
+        })
+      )
+      .catch(pubErr => Logger.error('Failed to publish error status update', { pubErr }));
+
+    // Re-throw the error so BullMQ marks the job as failed
+    throw error;
+  } finally {
+    try {
+      // Clean up temporary downloaded file
+      if (localFilePath && fileId) {
+        await fs
+          .unlink(localFilePath)
+          .catch(unlinkErr =>
+            Logger.warn(`Failed to delete temp file ${localFilePath}`, { unlinkErr })
+          );
+      }
+    } catch (cleanupError) {
+      Logger.warn('Error during cleanup', { cleanupError });
+    }
+  }
 }
 
 let worker;
 
 // Create the worker
 function createWorker() {
-    // Initialize Redis connections
-    initializeRedisConnections();
-    
-    return new Worker<ImageEffectJobData>(
-        QUEUE_NAME,
-        processImageEffectJob,
-        {
-            connection: redisConnection,
-            concurrency: parseInt(process.env.EFFECT_WORKER_CONCURRENCY || '3', 10),
-            limiter: {
-                max: 10,
-                duration: 1000,
-            },
-        }
-    );
+  // Initialize Redis connections
+  initializeRedisConnections();
+
+  return new Worker<ImageEffectJobData>(QUEUE_NAME, processImageEffectJob, {
+    connection: redisConnection,
+    concurrency: parseInt(process.env.EFFECT_WORKER_CONCURRENCY || '3', 10),
+    limiter: {
+      max: 10,
+      duration: 1000,
+    },
+  });
 }
 
 // Create and initialize worker
 worker = createWorker();
 
 worker.on('failed', (job: Job<ImageEffectJobData>, err: Error) => {
-    Logger.error(`Job ${job.id} failed for generation ${job.data.generationId}`, { error: err, attemptsMade: job.attemptsMade });
+  Logger.error(`Job ${job.id} failed for generation ${job.data.generationId}`, {
+    error: err,
+    attemptsMade: job.attemptsMade,
+  });
 });
 
 worker.on('error', err => {
-    Logger.error('BullMQ Worker Error', { error: err });
+  Logger.error('BullMQ Worker Error', { error: err });
 });
 
 // Graceful shutdown handler
 const gracefulShutdown = async () => {
-    try {
-        if (worker) {
-            await worker.close();
-        }
-        
-        if (redisPublisher) {
-            await redisPublisher.quit();
-            redisPublisher = null;
-        }
-        
-        if (redisConnection) {
-            await redisConnection.quit();
-            redisConnection = null;
-        }
-        
-        // If running in a worker thread, notify the parent
-        if (!isMainThread && parentPort) {
-            parentPort.postMessage({ type: 'shutdown', success: true });
-        }
-    } catch (error) {
-        Logger.error('Error during worker shutdown:', error);
-        process.exit(1);
+  try {
+    if (worker) {
+      await worker.close();
     }
+
+    if (redisPublisher) {
+      await redisPublisher.quit();
+      redisPublisher = null;
+    }
+
+    if (redisConnection) {
+      await redisConnection.quit();
+      redisConnection = null;
+    }
+
+    // If running in a worker thread, notify the parent
+    if (!isMainThread && parentPort) {
+      parentPort.postMessage({ type: 'shutdown', success: true });
+    }
+  } catch (error) {
+    Logger.error('Error during worker shutdown:', error);
+    process.exit(1);
+  }
 };
 
 // Register shutdown handlers
@@ -293,25 +381,25 @@ process.on('SIGTERM', gracefulShutdown);
 
 // If running in a worker thread, notify parent when ready
 if (!isMainThread && parentPort) {
-    parentPort.postMessage({ type: 'ready', worker: workerData?.workerName || 'imageEffectWorker' });
-    
-    // Listen for messages from the parent thread
-    parentPort.on('message', (message) => {
-        if (message.type === 'shutdown') {
-            gracefulShutdown();
-        }
-    });
+  parentPort.postMessage({ type: 'ready', worker: workerData?.workerName || 'imageEffectWorker' });
+
+  // Listen for messages from the parent thread
+  parentPort.on('message', message => {
+    if (message.type === 'shutdown') {
+      gracefulShutdown();
+    }
+  });
 }
 
 // Handle uncaught exceptions and unhandled rejections
-process.on('uncaughtException', (error) => {
-    Logger.error('Uncaught exception in imageEffectWorker:', error);
-    gracefulShutdown().catch(() => process.exit(1));
+process.on('uncaughtException', error => {
+  Logger.error('Uncaught exception in imageEffectWorker:', error);
+  gracefulShutdown().catch(() => process.exit(1));
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-    Logger.error('Unhandled rejection in imageEffectWorker:', { reason, promise });
-    gracefulShutdown().catch(() => process.exit(1));
+  Logger.error('Unhandled rejection in imageEffectWorker:', { reason, promise });
+  gracefulShutdown().catch(() => process.exit(1));
 });
 
-export default worker; 
+export default worker;
