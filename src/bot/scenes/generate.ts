@@ -584,6 +584,7 @@ export const generateScene = new Scenes.WizardScene<MyContext>(
 // Clear photo buffer between entering scene
 generateScene.enter(async ctx => {
   ctx.session.fileId = undefined;
+  await showInitialOptions(ctx);
 });
 
 // Generic error handler for the scene
