@@ -271,7 +271,7 @@ async function showRoomDesignEffectSelection(ctx: MyContext): Promise<void> {
     room_design_counry_modern: ctx.i18n.t('bot:generate.room_design_effect_country_modern'),
     room_design_classic: ctx.i18n.t('bot:generate.room_design_effect_classic'),
   };
-  
+
   // Create buttons for each banner effect
   const effectButtons = bannerEffectOptions.map(effect =>
     Markup.button.callback(effectLabels[effect], `select_banner_effect_${effect}`)

@@ -529,7 +529,7 @@ async function sendEffectResults(data) {
 
 export async function stopBot() {
   console.log('Stopping bot...');
-  
+
   // Clear webhook if it exists to prevent conflicts
   try {
     await bot.telegram.deleteWebhook({ drop_pending_updates: false });
@@ -652,7 +652,7 @@ export async function startBot() {
 
     if (useWebhook && apiBaseUrl) {
       console.log('Starting bot in webhook mode...');
-      
+
       try {
         await bot.telegram.deleteWebhook({ drop_pending_updates: true });
         console.log('Cleared existing webhook');
@@ -661,16 +661,16 @@ export async function startBot() {
       }
 
       const webhookUrl = `${apiBaseUrl}/api/bot/webhook`;
-      
+
       try {
         const result = await bot.telegram.setWebhook(webhookUrl, {
           allowed_updates: ['message', 'callback_query', 'inline_query'],
           drop_pending_updates: true,
         });
-        
+
         if (result) {
           console.log(`Webhook set successfully: ${webhookUrl}`);
-          
+
           const webhookInfo = await bot.telegram.getWebhookInfo();
           console.log('Webhook info:', {
             url: webhookInfo.url,
@@ -686,7 +686,7 @@ export async function startBot() {
       }
     } else {
       console.log('Starting bot in polling mode...');
-      
+
       try {
         await bot.telegram.deleteWebhook({ drop_pending_updates: true });
         console.log('Cleared webhook for polling mode');
