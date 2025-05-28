@@ -13,6 +13,7 @@ const initialOptionHandler = new Composer<MyContext>();
 const effectSelectorHandler = new Composer<MyContext>();
 const logoEffectSelectorHandler = new Composer<MyContext>();
 const bannerEffectSelectorHandler = new Composer<MyContext>();
+const roomDesignSelectorHandler = new Composer<MyContext>();
 const photoHandler = new Composer<MyContext>();
 const photoAndTextHandler = new Composer<MyContext>();
 
@@ -47,6 +48,7 @@ const logoEffectOptions = [
   'organic',
 ];
 
+// Banner effect options
 const bannerEffectOptions = [
   'banner_without_effects',
   'banner_in_the_haze',
@@ -54,6 +56,16 @@ const bannerEffectOptions = [
   'banner_molten_glass',
   'banner_on_wood',
   'banner_organic',
+];
+
+// Room design effect options
+const roomDesignEffectOptions = [
+  'room_design_own_prompt',
+  'room_design_remove_furniture',
+  'room_design_hi_tech',
+  'room_design_country',
+  'room_design_country_modern',
+  'room_design_classic',
 ];
 
 // WIZARD STEP TRANSITIONS & HANDLERS
@@ -190,6 +202,9 @@ async function showLogoEffectSelection(ctx: MyContext): Promise<void> {
   }
 }
 
+/**
+ * Sends the banner effect selection message and keyboard.
+ */
 async function showBannerEffectSelection(ctx: MyContext): Promise<void> {
   // Create localized button labels
   const effectLabels = {
@@ -202,6 +217,61 @@ async function showBannerEffectSelection(ctx: MyContext): Promise<void> {
     banner_organic: ctx.i18n.t('bot:generate.banner_effect_organic'),
   };
 
+  // Create buttons for each banner effect
+  const effectButtons = bannerEffectOptions.map(effect =>
+    Markup.button.callback(effectLabels[effect], `select_banner_effect_${effect}`)
+  );
+
+  // Arrange buttons
+  const keyboardRows = [];
+  for (let i = 0; i < effectButtons.length; i += 1) {
+    const row = [effectButtons[i]];
+    keyboardRows.push(row);
+  }
+
+  const messageText = ctx.i18n.t('bot:generate.select_banner_style_prompt');
+
+  const replyMarkup = Markup.inlineKeyboard(keyboardRows).reply_markup;
+
+  try {
+    if (ctx.callbackQuery?.message) {
+      await ctx.editMessageText(messageText, {
+        parse_mode: 'HTML',
+        reply_markup: replyMarkup,
+      });
+    } else {
+      await ctx.reply(messageText, {
+        parse_mode: 'HTML',
+        reply_markup: replyMarkup,
+      });
+    }
+  } catch (error) {
+    Logger.warn('Failed to edit or send banner effect selection message, sending new one.', {
+      error,
+    });
+    await ctx.reply(messageText, {
+      parse_mode: 'HTML',
+      reply_markup: replyMarkup,
+    });
+  }
+}
+
+/**
+ * Sends the room design effect selection message and keyboard.
+ */
+async function showRoomDesignEffectSelection(ctx: MyContext): Promise<void> {
+  // Create localized button labels
+  const effectLabels = {
+    banner_without_effects: ctx.i18n.t('bot:generate.banner_effect_without_effects'),
+
+    room_design_own_prompt: ctx.i18n.t('bot:generate.room_design_effect_own_prompt'),
+    room_design_remove_furniture: ctx.i18n.t('bot:generate.room_design_effect_remove_furniture'),
+    room_design_hi_tech: ctx.i18n.t('bot:generate.room_design_effect_hi_tech'),
+    room_design_country: ctx.i18n.t('bot:generate.room_design_effect_country'),
+    room_design_counry_modern: ctx.i18n.t('bot:generate.room_design_effect_country_modern'),
+    room_design_classic: ctx.i18n.t('bot:generate.room_design_effect_classic'),
+  };
+  
   // Create buttons for each banner effect
   const effectButtons = bannerEffectOptions.map(effect =>
     Markup.button.callback(effectLabels[effect], `select_banner_effect_${effect}`)

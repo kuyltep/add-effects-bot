@@ -12,6 +12,7 @@ export interface ImageEffectJobData {
   effect?: EffectType;
   logoEffect?: string;
   bannerEffect?: string;
+  roomDesignEffect?: string;
   description?: string;
   chatId: string;
   messageId: number;
