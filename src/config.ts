@@ -31,6 +31,7 @@ export const redisConfig = {
 export const botConfig = {
   token: process.env.TELEGRAM_BOT_TOKEN || '',
   webhookDomain: process.env.WEBHOOK_DOMAIN || '',
+  apiBaseUrl: process.env.API_BASE_URL || '',
   useWebhook: process.env.NODE_ENV === 'production',
   botUsername: process.env.BOT_USERNAME || '',
 };

@@ -529,6 +529,15 @@ async function sendEffectResults(data) {
 
 export async function stopBot() {
   console.log('Stopping bot...');
+  
+  // Clear webhook if it exists to prevent conflicts
+  try {
+    await bot.telegram.deleteWebhook({ drop_pending_updates: false });
+    console.log('Webhook cleared');
+  } catch (error) {
+    console.warn('Failed to clear webhook during shutdown:', error);
+  }
+
   // Ensure Redis subscriber exists before trying to unsubscribe and quit
   if (redisSubscriber) {
     try {
@@ -637,8 +646,58 @@ export async function startBot() {
       await ctx.scene.enter('videoEffect', { source: 'generate' });
     });
 
-    await bot.launch();
+    // Determine if we should use webhook or polling
+    const useWebhook = process.env.NODE_ENV === 'production';
+    const apiBaseUrl = process.env.API_BASE_URL;
 
+    if (useWebhook && apiBaseUrl) {
+      console.log('Starting bot in webhook mode...');
+      
+      try {
+        await bot.telegram.deleteWebhook({ drop_pending_updates: true });
+        console.log('Cleared existing webhook');
+      } catch (error) {
+        console.warn('Failed to clear existing webhook:', error);
+      }
+
+      const webhookUrl = `${apiBaseUrl}/api/bot/webhook`;
+      
+      try {
+        const result = await bot.telegram.setWebhook(webhookUrl, {
+          allowed_updates: ['message', 'callback_query', 'inline_query'],
+          drop_pending_updates: true,
+        });
+        
+        if (result) {
+          console.log(`Webhook set successfully: ${webhookUrl}`);
+          
+          const webhookInfo = await bot.telegram.getWebhookInfo();
+          console.log('Webhook info:', {
+            url: webhookInfo.url,
+            has_custom_certificate: webhookInfo.has_custom_certificate,
+            pending_update_count: webhookInfo.pending_update_count,
+          });
+        } else {
+          throw new Error('Failed to set webhook');
+        }
+      } catch (error) {
+        console.error('Failed to set webhook, falling back to polling:', error);
+        await bot.launch();
+      }
+    } else {
+      console.log('Starting bot in polling mode...');
+      
+      try {
+        await bot.telegram.deleteWebhook({ drop_pending_updates: true });
+        console.log('Cleared webhook for polling mode');
+      } catch (error) {
+        console.warn('Failed to clear webhook:', error);
+      }
+
+      await bot.launch();
+    }
+
+    // Set bot commands
     await bot.telegram.setMyCommands([
       { command: 'start', description: 'Start the bot' },
       { command: 'referral', description: 'Referral program' },
@@ -651,6 +710,8 @@ export async function startBot() {
       { command: 'upgrade', description: 'Enhance photo quality' },
       { command: 'video_effect', description: 'Apply video effects to photo' },
     ]);
+
+    console.log(`Bot started successfully in ${useWebhook ? 'webhook' : 'polling'} mode`);
   } catch (error) {
     console.error('Error starting Telegram bot:', error);
     throw error;
