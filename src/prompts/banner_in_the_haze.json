@@ -1,0 +1,38 @@
+
+{
+  "style": "photorealistic volumetric simulation",
+  "material": "flowing dynamic smoke with ephemeral properties",
+  "physical_behavior": {
+    "density": "variable with central solidity fading to wispy edges",
+    "movement": "gentle rising current with slight turbulence",
+    "dissipation": "gradual fade at outer boundaries"
+  },
+  "banner_treatment": {
+    "formation_method": "banner shape manifested as if smoke naturally formed it",
+    "edge_definition": "partially defined with intentional ambiguity",
+    "core_stability": "recognizable center with ethereal boundaries"
+  },
+  "lighting": {
+    "primary": "backlit with rim lighting effect",
+    "color_temperature": "cool with slight color variation",
+    "beam_effects": "subtle light rays piercing through translucent areas",
+    "internal_glow": "gentle inner luminosity in brand color"
+  },
+  "color_scheme": {
+    "primary_smoke": "base white with subtle tinting color",
+    "secondary_wisps": "complementary color accents in thinner areas",
+    "ambient_influence": "environmental color bleeding at edges",
+    "translucency": "variable opacity revealing depth"
+  },
+  "background": {
+    "style": "deep gradient from dark to darker",
+    "ambient_fog": "subtle volumetric depth in background",
+    "negative_space": "strategic dark areas enhancing smoke visibility"
+  },
+  "post_processing": {
+    "particle_detail": "ultra-high resolution smoke particle rendering",
+    "depth_enhancement": "subtle atmospheric perspective",
+    "glow_integration": "seamless luminosity in dense areas",
+    "contrast_range": "expanded to capture subtle smoke details"
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "styleAesthetic": {
+  "overallVibe": "Lush organic biomimicry",
+  "colorPalette": {
+  "background": "Deep black",
+  "accents": [
+  "Vivid chlorophyll green",
+  "Hints of mossy yellow-green",
+  "Occasional sparkle-like reflections"
+  ]
+  },
+  "materialsAndTextures": [
+  {
+  "type": "Lush moss and foliage",
+  "description": "Dense, highly detailed surface of moss-like greenery with a rich natural texture, mimicking a forest floor or overgrown stone"
+  },
+  {
+  "type": "Natural wet gloss",
+  "description": "Occasional glossy highlights suggesting dew or moisture on the surface"
+  }
+  ],
+  "lightingAndShadows": {
+  "description": "Soft, controlled lighting with subtle reflections to highlight texture without flattening the form",
+  "effect": "Creates a natural, moist, and vibrant organic look with visual depth"
+  },
+  "moodKeywords": [
+  "Natural",
+  "Botanical",
+  "Tactile",
+  "Earthy",
+  "Eco-futuristic"
+  ],
+  "keyAttributes": [
+  "Volumetric moss-like texture",
+  "Abstract organic forms",
+  "Micro-detail rendering of foliage",
+  "Minimalist black background for contrast",
+  "Biophilic aesthetic with a sculptural essence"
+  ]
+  }
+  }
