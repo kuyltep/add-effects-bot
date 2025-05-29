@@ -18,12 +18,20 @@ export interface ImageEffectJobData {
   messageId: number;
   language: string;
   resolution?: string;
+  apiProvider: API_PROVIDER;
 }
 
 const QUEUE_NAME = 'image-effect-generation';
 
 // Create a Redis connection using utility function
 const redisConnection = createRedisConnection();
+
+// API providers
+export type API_PROVIDER =
+  'openai' |
+  'fal-ai' |
+  'gap';
+
 
 // Create the BullMQ queue instance
 export const imageEffectQueue = new Queue<ImageEffectJobData>(QUEUE_NAME, {

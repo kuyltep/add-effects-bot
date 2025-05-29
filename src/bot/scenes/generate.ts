@@ -407,6 +407,7 @@ async function handlePhotoInput(ctx: MyContext, fileId: string): Promise<void> {
       messageId: statusMessage.message_id,
       language: language || ctx.i18n.locale || 'en',
       resolution: resolution,
+      apiProvider: 'openai',
     });
   } catch (error) {
     Logger.error(error, { context: 'queueImageGenerationJob', userId });
@@ -443,6 +444,7 @@ async function handleTextInput(ctx: MyContext): Promise<void> {
       chatId: ctx.chat?.id.toString() || '',
       messageId: statusMessage.message_id,
       language: language || ctx.i18n.locale || 'en',
+      apiProvider: 'openai',
     });
   } catch (error) {
     Logger.error(error, { context: 'queueImageGenerationJob', userId });

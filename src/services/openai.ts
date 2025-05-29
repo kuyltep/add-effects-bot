@@ -143,7 +143,7 @@ export async function editImageOpenAI(
 /**
  * Processes logo with the specified effect style
  */
-export async function editLogoWithEffect(
+async function editLogoWithEffect(
   imagePath: string,
   logoEffect: string,
   resolution: Resolution = 'SQUARE'
@@ -175,7 +175,7 @@ export async function editLogoWithEffect(
   }
 }
 
-export async function editBannerWithEffect(
+async function editBannerWithEffect(
   imagePath: string,
   bannerEffect: string,
   description: string = '',
@@ -209,7 +209,7 @@ export async function editBannerWithEffect(
   }
 }
 
-export async function createBannerWithEffect(
+async function createBannerWithEffect(
   outputDir: string,
   bannerEffect: string,
   description: string = '',
@@ -246,7 +246,7 @@ export async function createBannerWithEffect(
   }
 }
 
-export async function createImageWithQuality(
+async function createImageWithQuality(
   outputDir: string,
   prompt: string,
   quality: 'medium' | 'high' = 'medium',
@@ -306,7 +306,7 @@ export async function createImageWithQuality(
   }
 }
 
-export async function editImageWithQuality(
+async function editImageWithQuality(
   imagePath: string,
   prompt: string,
   quality: 'medium' | 'high' = 'medium',

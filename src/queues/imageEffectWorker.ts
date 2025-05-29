@@ -11,6 +11,7 @@ import { createRedisConnection, createRedisPublisher } from '../utils/redis';
 import { applyImageEffect } from '../services/fal-ai';
 import { isMainThread, parentPort, workerData } from 'worker_threads';
 import { createImageOpenAI, editImageOpenAI } from '../services/openai';
+import { API_PROVIDER } from './imageEffectQueue';
 
 // Constants
 const QUEUE_NAME = 'image-effect-generation';
@@ -140,6 +141,7 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
     bannerEffect,
     roomDesignEffect,
     prompt,
+    apiProvider,
   } = job.data;
 
   let localFilePath: string | null = null;
@@ -197,32 +199,28 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
     } else if (FAL_AI_EFFECTS.includes(effect)) {
       // Process with FAL AI
       finalOutputPath = await applyImageEffect(localFilePath, effect, resolution as Resolution);
-    } else if (OPENAI_EFFECTS.includes(effect)) {
+    } else if (OPENAI_EFFECTS.includes(effect) && apiProvider === 'openai') {
       // Pass the resolution to OpenAI service
       finalOutputPath = await editImageOpenAI(
         localFilePath,
         effect,
         resolution as Resolution,
-        job.data.logoEffect
+        job.data.logoEffect,
       );
-    } else if (job.data.logoEffect) {
+    } else if (job.data.logoEffect || job.data.bannerEffect || job.data.roomDesignEffect) {
       // Process logo effects
-      finalOutputPath = await editImageOpenAI(
-        localFilePath,
-        null,
-        resolution as Resolution,
-        job.data.logoEffect
-      );
-    } else if (job.data.bannerEffect) {
-      // Process logo effects
-      finalOutputPath = await editImageOpenAI(
-        localFilePath,
-        null,
-        resolution as Resolution,
-        undefined,
-        job.data.bannerEffect,
-        prompt,
-      );
+      if (apiProvider === 'openai') {
+        finalOutputPath = await editImageOpenAI(
+          localFilePath,
+          effect,
+          resolution as Resolution,
+          job.data.logoEffect,
+          job.data.bannerEffect,
+          prompt,
+        );
+      } else if (apiProvider === 'fal-ai') {
+        finalOutputPath = await applyImageEffect(localFilePath, effect, resolution as Resolution);
+      }
     } else {
       throw new Error(`Unsupported effect type: ${effect}`);
     }
