@@ -553,6 +553,7 @@ export const generateScene = new Scenes.WizardScene<MyContext>(
   'generate',
   // Step 0: Initial check and options selection
   async ctx => {
+    ctx.session.fileId = undefined;
     const telegramId = ctx.from?.id.toString() || '';
     const initState = await initializeWizardState(ctx, telegramId);
     if (!initState || !initState.userData) {
@@ -580,12 +581,6 @@ export const generateScene = new Scenes.WizardScene<MyContext>(
   // Step 6: Handle photo + text input
   photoAndTextHandler
 );
-
-// Clear photo buffer between entering scene
-generateScene.enter(async ctx => {
-  ctx.session.fileId = undefined;
-  await showInitialOptions(ctx);
-});
 
 // Generic error handler for the scene
 async function exitWithError(ctx: MyContext, messageKey: string) {
