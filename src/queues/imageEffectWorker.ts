@@ -137,8 +137,9 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
     language,
     resolution = 'SQUARE',
     logoEffect,
-    description,
     bannerEffect,
+    roomDesignEffect,
+    prompt,
   } = job.data;
 
   let localFilePath: string | null = null;
@@ -190,7 +191,8 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
         resolution as Resolution,
         logoEffect,
         bannerEffect,
-        description
+        roomDesignEffect,
+        prompt,
       );
     } else if (FAL_AI_EFFECTS.includes(effect)) {
       // Process with FAL AI
@@ -219,7 +221,7 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
         resolution as Resolution,
         undefined,
         job.data.bannerEffect,
-        description
+        prompt,
       );
     } else {
       throw new Error(`Unsupported effect type: ${effect}`);

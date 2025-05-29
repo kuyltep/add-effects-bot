@@ -23,6 +23,7 @@ import { createMainKeyboardMiddleware } from '../utils/sceneHelpers';
 import path from 'path';
 import fetch from 'node-fetch';
 import { checkChannelSubscription } from './middleware/check-subscription';
+import { roomDesignScene } from './scenes/roomDesign';
 
 // Создаем инстанс бота
 export const bot = new Telegraf<MyContext>(process.env.TELEGRAM_BOT_TOKEN || '');
@@ -42,6 +43,7 @@ const scenes = [
   videoScene,
   upgradeScene,
   videoEffectScene,
+  roomDesignScene,
 ];
 
 // Создаем менеджер сцен
@@ -597,6 +599,10 @@ export async function startBot() {
       'video_effect',
       async ctx => await ctx.scene.enter('videoEffect', { source: 'command' })
     );
+    bot.command(
+      'room_design',
+      async ctx => await ctx.scene.enter('roomDesign')
+    );
 
     // Добавляем обработчик для кнопки создания еще
     bot.action('generate_more', async ctx => {
@@ -638,6 +644,11 @@ export async function startBot() {
     bot.action('video_effect', async ctx => {
       await ctx.answerCbQuery();
       await ctx.scene.enter('videoEffect', { source: 'command' });
+    });
+
+    bot.action('room_design', async ctx => {
+      await ctx.answerCbQuery();
+      await ctx.scene.enter('roomDesign');
     });
 
     // Adding a handler for video effects from generate scene
@@ -709,6 +720,8 @@ export async function startBot() {
       { command: 'video', description: 'Generate video from restored photo' },
       { command: 'upgrade', description: 'Enhance photo quality' },
       { command: 'video_effect', description: 'Apply video effects to photo' },
+      { command: 'room_design', description: 'Apply room design' },
+
     ]);
 
     console.log(`Bot started successfully in ${useWebhook ? 'webhook' : 'polling'} mode`);

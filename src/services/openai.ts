@@ -50,13 +50,14 @@ export async function createImageOpenAI(
   resolution: Resolution = 'SQUARE',
   logoEffect?: string,
   bannerEffect?: string,
-  description?: string
+  roomDesignEffect?: string,
+  prompt?: string
 ): Promise<string> {
   try {
     await fs.promises.mkdir(outputDir, { recursive: true });
 
     if (bannerEffect) {
-      return await createBannerWithEffect(outputDir, bannerEffect, description, resolution);
+      return await createBannerWithEffect(outputDir, bannerEffect, prompt, resolution);
     }
 
     // Validate regular effect type

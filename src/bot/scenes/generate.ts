@@ -13,7 +13,6 @@ const initialOptionHandler = new Composer<MyContext>();
 const effectSelectorHandler = new Composer<MyContext>();
 const logoEffectSelectorHandler = new Composer<MyContext>();
 const bannerEffectSelectorHandler = new Composer<MyContext>();
-const roomDesignSelectorHandler = new Composer<MyContext>();
 const photoHandler = new Composer<MyContext>();
 const photoAndTextHandler = new Composer<MyContext>();
 
@@ -58,16 +57,6 @@ const bannerEffectOptions = [
   'banner_organic',
 ];
 
-// Room design effect options
-const roomDesignEffectOptions = [
-  'room_design_own_prompt',
-  'room_design_remove_furniture',
-  'room_design_hi_tech',
-  'room_design_country',
-  'room_design_country_modern',
-  'room_design_classic',
-];
-
 // WIZARD STEP TRANSITIONS & HANDLERS
 
 /**
@@ -78,6 +67,7 @@ async function showInitialOptions(ctx: MyContext): Promise<void> {
   const videoEffectsText = ctx.i18n.t('bot:generate.effect_video');
   const stylizeLogoText = ctx.i18n.t('bot:generate.stylize_logo');
   const stylizeBannerText = ctx.i18n.t('bot:generate.stylize_banner');
+  const stylizeRoomDesign = ctx.i18n.t('bot:generate.room_design');
 
   await ctx.reply(ctx.i18n.t('bot:generate.select_option'), {
     parse_mode: 'HTML',
@@ -86,6 +76,8 @@ async function showInitialOptions(ctx: MyContext): Promise<void> {
       [Markup.button.callback(videoEffectsText, 'select_video_effects')],
       [Markup.button.callback(stylizeLogoText, 'select_logo_styling')],
       [Markup.button.callback(stylizeBannerText, 'select_banner_styling')],
+      [Markup.button.callback(stylizeRoomDesign, 'select_room_design')],
+
     ]).reply_markup,
   });
 }
@@ -215,61 +207,6 @@ async function showBannerEffectSelection(ctx: MyContext): Promise<void> {
     banner_molten_glass: ctx.i18n.t('bot:generate.banner_effect_molten_glass'),
     banner_on_wood: ctx.i18n.t('bot:generate.banner_effect_on_wood'),
     banner_organic: ctx.i18n.t('bot:generate.banner_effect_organic'),
-  };
-
-  // Create buttons for each banner effect
-  const effectButtons = bannerEffectOptions.map(effect =>
-    Markup.button.callback(effectLabels[effect], `select_banner_effect_${effect}`)
-  );
-
-  // Arrange buttons
-  const keyboardRows = [];
-  for (let i = 0; i < effectButtons.length; i += 1) {
-    const row = [effectButtons[i]];
-    keyboardRows.push(row);
-  }
-
-  const messageText = ctx.i18n.t('bot:generate.select_banner_style_prompt');
-
-  const replyMarkup = Markup.inlineKeyboard(keyboardRows).reply_markup;
-
-  try {
-    if (ctx.callbackQuery?.message) {
-      await ctx.editMessageText(messageText, {
-        parse_mode: 'HTML',
-        reply_markup: replyMarkup,
-      });
-    } else {
-      await ctx.reply(messageText, {
-        parse_mode: 'HTML',
-        reply_markup: replyMarkup,
-      });
-    }
-  } catch (error) {
-    Logger.warn('Failed to edit or send banner effect selection message, sending new one.', {
-      error,
-    });
-    await ctx.reply(messageText, {
-      parse_mode: 'HTML',
-      reply_markup: replyMarkup,
-    });
-  }
-}
-
-/**
- * Sends the room design effect selection message and keyboard.
- */
-async function showRoomDesignEffectSelection(ctx: MyContext): Promise<void> {
-  // Create localized button labels
-  const effectLabels = {
-    banner_without_effects: ctx.i18n.t('bot:generate.banner_effect_without_effects'),
-
-    room_design_own_prompt: ctx.i18n.t('bot:generate.room_design_effect_own_prompt'),
-    room_design_remove_furniture: ctx.i18n.t('bot:generate.room_design_effect_remove_furniture'),
-    room_design_hi_tech: ctx.i18n.t('bot:generate.room_design_effect_hi_tech'),
-    room_design_country: ctx.i18n.t('bot:generate.room_design_effect_country'),
-    room_design_counry_modern: ctx.i18n.t('bot:generate.room_design_effect_country_modern'),
-    room_design_classic: ctx.i18n.t('bot:generate.room_design_effect_classic'),
   };
 
   // Create buttons for each banner effect
@@ -448,7 +385,7 @@ async function handlePhotoInput(ctx: MyContext, fileId: string): Promise<void> {
     return exitWithError(ctx, 'bot:errors.general');
   }
 
-  const { effect, logoEffect, bannerEffect, description } = state.generationData;
+  const { effect, logoEffect, bannerEffect, prompt } = state.generationData;
   const { id: userId, language } = state.userData;
   const { resolution } = state.userSettings;
 
@@ -465,7 +402,7 @@ async function handlePhotoInput(ctx: MyContext, fileId: string): Promise<void> {
       effect,
       logoEffect, // Pass the logo effect if it exists
       bannerEffect,
-      description,
+      prompt,
       chatId: ctx.chat?.id.toString() || '',
       messageId: statusMessage.message_id,
       language: language || ctx.i18n.locale || 'en',
@@ -487,7 +424,7 @@ async function handleTextInput(ctx: MyContext): Promise<void> {
     return exitWithError(ctx, 'bot:errors.general');
   }
 
-  const { effect, logoEffect, bannerEffect, description } = state.generationData;
+  const { effect, logoEffect, bannerEffect, prompt } = state.generationData;
   const { id: userId, language } = state.userData;
 
   try {
@@ -501,8 +438,8 @@ async function handleTextInput(ctx: MyContext): Promise<void> {
       generationId: '', // Will be generated in the service
       effect,
       logoEffect, // Pass the logo effect if it exists
-      bannerEffect,
-      description,
+      bannerEffect, // Pass the banner effect if it exists
+      prompt, // Pass the prompt if it exists
       chatId: ctx.chat?.id.toString() || '',
       messageId: statusMessage.message_id,
       language: language || ctx.i18n.locale || 'en',
@@ -571,7 +508,7 @@ photoAndTextHandler.on('text', async ctx => {
     return exitScene(ctx, 'bot:generate.cancelled');
   }
   const state = ctx.wizard.state as GenerateWizardState;
-  state.generationData.description = ctx.message.text;
+  state.generationData.prompt = ctx.message.text;
 
   if (ctx.session.fileId) {
     // Clear image buffer even error occurs
@@ -613,6 +550,12 @@ initialOptionHandler.action('select_banner_styling', async ctx => {
   return ctx.wizard.selectStep(5); // Move to banner effect selection handler step
 });
 
+initialOptionHandler.action('select_room_design', async ctx => {
+  await ctx.answerCbQuery();
+  return ctx.scene.enter('roomDesign');
+});
+
+
 initialOptionHandler.action('cancel_generation', async ctx => {
   await ctx.answerCbQuery();
   return exitScene(ctx, 'bot:generate.cancelled');
@@ -623,6 +566,7 @@ export const generateScene = new Scenes.WizardScene<MyContext>(
   'generate',
   // Step 0: Initial check and options selection
   async ctx => {
+    ctx.session.fileId = undefined;
     const telegramId = ctx.from?.id.toString() || '';
     const initState = await initializeWizardState(ctx, telegramId);
     if (!initState || !initState.userData) {
@@ -650,12 +594,6 @@ export const generateScene = new Scenes.WizardScene<MyContext>(
   // Step 6: Handle photo + text input
   photoAndTextHandler
 );
-
-// Clear photo buffer between entering scene
-generateScene.enter(async ctx => {
-  ctx.session.fileId = undefined;
-  await showInitialOptions(ctx);
-});
 
 // Generic error handler for the scene
 async function exitWithError(ctx: MyContext, messageKey: string) {

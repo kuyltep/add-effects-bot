@@ -13,7 +13,7 @@ export interface ImageEffectJobData {
   logoEffect?: string;
   bannerEffect?: string;
   roomDesignEffect?: string;
-  description?: string;
+  prompt?: string;
   chatId: string;
   messageId: number;
   language: string;
