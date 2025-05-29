@@ -11,7 +11,7 @@ import { createRedisConnection, createRedisPublisher } from '../utils/redis';
 import { applyImageEffect } from '../services/fal-ai';
 import { isMainThread, parentPort, workerData } from 'worker_threads';
 import { createImageOpenAI, editImageOpenAI } from '../services/openai';
-import { API_PROVIDER } from './imageEffectQueue';
+import { editImageWithAnotherAi } from '../services/anotherAiApi';
 
 // Constants
 const QUEUE_NAME = 'image-effect-generation';
@@ -180,7 +180,7 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
         chatId,
         messageId,
         text: getMessage('applying_effect', language, {
-          effect: effect || logoEffect || bannerEffect,
+          effect: effect || logoEffect || bannerEffect || roomDesignEffect,
         }),
       })
     );
@@ -208,7 +208,10 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
         job.data.logoEffect,
       );
     } else if (job.data.logoEffect || job.data.bannerEffect || job.data.roomDesignEffect) {
-      // Process logo effects
+
+      const effect = job.data.logoEffect || job.data.bannerEffect || job.data.roomDesignEffect;
+      const effectType = effect.replace('/Effect$/', '');
+
       if (apiProvider === 'openai') {
         finalOutputPath = await editImageOpenAI(
           localFilePath,
@@ -218,8 +221,14 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
           job.data.bannerEffect,
           prompt,
         );
-      } else if (apiProvider === 'fal-ai') {
-        finalOutputPath = await applyImageEffect(localFilePath, effect, resolution as Resolution);
+      } else if (apiProvider === 'gap') {
+        finalOutputPath = await editImageWithAnotherAi(
+          localFilePath,
+          effect,
+          effectType,
+          resolution as Resolution,
+          prompt,
+        );
       }
     } else {
       throw new Error(`Unsupported effect type: ${effect}`);
