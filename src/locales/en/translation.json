@@ -107,12 +107,18 @@
       "banner_effect_organic": "🌱 Organic Style",
       "send_banner_for_effect": "📸 Great! Now you can send a photo with a description or just type what you want to see",
       "banner_wait_for_description": "🔥 Great! Now describe what you want to see on the banner",
-      "room_design_effect_own_prompt": "📝 Enter a prompt",
+      "room_design": "🏠 Design a room",
+      "select_room_design_style_prompt": "🎨 Choose a style for your room design",
+      "room_design_effect_own_prompt": "📝 Enter your own prompt",
       "room_design_effect_remove_furniture": "🧹 Remove furniture",
-      "room_design_effect_hi_tech": "🦾 Make furniture “High-tech”",
-      "room_design_effect_country": "🌾 Make furniture “Country”",
-      "room_design_effect_country_modern": "🏡 Make furniture “Country-modern”",
-      "room_design_effect_classic": "🏛️ Make furniture “Classic”"
+      "room_design_effect_hi_tech": "🦾 Make the furniture 'High-tech'",
+      "room_design_effect_country": "🌾 Make the furniture 'Country'",
+      "room_design_effect_country_modern": "🏡 Make the furniture 'Modern Country'",
+      "room_design_effect_classic": "🏛️ Make the furniture 'Classic'",
+      "send_room_for_effect": "📸 Great! Now send a photo of the room",
+      "send_room_not_prompt": "A photo is required for this to work. Please send a picture of the room ✨",
+      "send_prompt_for_design": "Enter a prompt describing what you'd like to do with your photo. We'll try to preserve as many original details as possible 👇🏻"
+    
     },
     "video": {
       "user_not_found": "User not found. Please start the bot again with /start.",
