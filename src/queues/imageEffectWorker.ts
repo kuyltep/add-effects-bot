@@ -124,6 +124,16 @@ async function downloadTelegramFile(fileId: string): Promise<string> {
 
   throw new Error(`Timed out after ${maxWaitTime}ms waiting for file download`);
 }
+
+/**
+ * Downloads multiple files from Telegram using the bot core via Redis.
+ * @param fileIds - Array of Telegram file IDs.
+ * @returns Array of local paths where the files were downloaded.
+ */
+async function downloadMultipleTelegramFiles(fileIds: string[]): Promise<string[]> {
+  return Promise.all(fileIds.map(fileId => downloadTelegramFile(fileId)));
+}
+
 /**
  * Processes an image effect generation job.
  */
@@ -131,7 +141,7 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
   const {
     generationId,
     userId,
-    fileId,
+    fileIds,
     effect,
     chatId,
     messageId,
@@ -146,6 +156,7 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
   } = job.data;
 
   let localFilePath: string | null = null;
+  let localFilePaths: string[] = null;
   let finalOutputPath: string | null = null;
 
   try {
@@ -168,10 +179,14 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
     );
 
     // 2. Download the original image from Telegram via bot core or create
-    if (fileId) {
-      localFilePath = await downloadTelegramFile(fileId);
+    if (fileIds) {
+      localFilePaths = await downloadMultipleTelegramFiles(fileIds);
     } else {
       localFilePath = path.join(UPLOAD_DIR, 'temp');
+    }
+
+    if (localFilePaths.length === 1) {
+      localFilePath = localFilePaths[0];
     }
 
     // 3. Apply effect based on type
@@ -187,7 +202,7 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
     );
 
     // Generate image with OpenAI service
-    if (!fileId) {
+    if (!fileIds) {
       finalOutputPath = await createImageOpenAI(
         localFilePath,
         effect,
@@ -312,7 +327,7 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
   } finally {
     try {
       // Clean up temporary downloaded file
-      if (localFilePath && fileId) {
+      if (localFilePath && fileIds) {
         await fs
           .unlink(localFilePath)
           .catch(unlinkErr =>

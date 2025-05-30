@@ -131,5 +131,6 @@ export interface GenerationData {
   logoEffect?: string; // For logo styling effects
   bannerEffect?: string; // For banner styling effects
   roomDesignEffect?: string; // For room design styling effects
+  jointPhotoEffect?: string; // For joint photo styling effects
   description?: string; // Text description for prompt
 }

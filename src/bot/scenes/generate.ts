@@ -397,7 +397,7 @@ async function handlePhotoInput(ctx: MyContext, fileId: string): Promise<void> {
     await queueImageGenerationJob({
       userId,
       generationId: '', // Will be generated in the service
-      fileId: fileId, // Pass file ID from Telegram
+      fileIds: [fileId], // Pass file ID from Telegram
       effect,
       logoEffect, // Pass the logo effect if it exists
       bannerEffect,

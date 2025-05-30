@@ -24,6 +24,7 @@ const effectModelMap: Record<string, string> = {
   plushify: 'fal-ai/plushify',
   ghiblify: 'fal-ai/ghiblify',
   cartoonify: 'fal-ai/cartoonify',
+  hunyuan_avatar: 'fal-ai/hunyuan-avatar',
 };
 
 export async function applyImageEffect(
