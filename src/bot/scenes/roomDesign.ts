@@ -10,7 +10,8 @@ const photoHandler = new Composer<MyContext>();
 const ownPromptHandler = new Composer<MyContext>();
 
 // Create the room design scene
-export const roomDesignScene = new Scenes.WizardScene<MyContext>('roomDesign', 
+export const roomDesignScene = new Scenes.WizardScene<MyContext>(
+  'roomDesign',
   async ctx => {
     ctx.session.fileId = undefined;
     try {
@@ -23,7 +24,7 @@ export const roomDesignScene = new Scenes.WizardScene<MyContext>('roomDesign',
   },
   effectSelectorHandler,
   photoHandler,
-  ownPromptHandler,
+  ownPromptHandler
 );
 
 // Room design effect options
@@ -64,7 +65,7 @@ async function showRoomDesignEffectSelection(ctx: MyContext): Promise<void> {
     const row = [effectButtons[i]];
     if (i + 1 < effectButtons.length) {
       row.push(effectButtons[i + 1]);
-    // Push empty button to align
+      // Push empty button to align
     } else {
       const emptyButton = Markup.button.callback(' ', 'noop');
       row.push(emptyButton);
@@ -121,7 +122,11 @@ roomDesignScene.action(/^select_room_design_effect_(.+)$/, async ctx => {
     });
   }
 
-  return ctx.wizard.selectStep(2);
+  if (selectedEffect === 'room_design_own_prompt') {
+    return ctx.wizard.selectStep(3);
+  } else {
+    return ctx.wizard.selectStep(2);
+  }
 });
 
 // Handle photo message
@@ -146,14 +151,14 @@ photoHandler.on('text', async ctx => {
   if (ctx.message.text === '/cancel') {
     return exitScene(ctx, 'bot:generate.cancelled');
   }
-  await ctx.reply(ctx.i18n.t('bot:generate.send_photo_for_effect'));
+  await ctx.reply(ctx.i18n.t('bot:generate.send_room_not_prompt'));
 });
 
 ownPromptHandler.on('photo', async ctx => {
   const photoSizes = ctx.message.photo;
   const largestPhoto = photoSizes[photoSizes.length - 1];
   ctx.session.fileId = largestPhoto.file_id;
-  await ctx.reply(ctx.i18n.t('bot:generate.banner_wait_for_description'));
+  await ctx.reply(ctx.i18n.t('bot:generate.send_prompt_for_design'));
 });
 
 ownPromptHandler.on('document', async ctx => {
@@ -163,7 +168,7 @@ ownPromptHandler.on('document', async ctx => {
     return;
   }
   ctx.session.fileId = document.file_id;
-  await ctx.reply(ctx.i18n.t('bot:generate.banner_wait_for_description'));
+  await ctx.reply(ctx.i18n.t('bot:generate.send_prompt_for_design'));
 });
 
 ownPromptHandler.on('text', async ctx => {
@@ -179,6 +184,7 @@ ownPromptHandler.on('text', async ctx => {
     ctx.session.fileId = undefined;
     await handlePhotoInput(ctx, tempFileId);
   } else {
+    await ctx.reply(ctx.i18n.t('bot:generate.send_photo_for_effect'));
     return ctx.wizard.selectStep(2);
   }
 });
@@ -221,6 +227,7 @@ async function handlePhotoInput(ctx: MyContext, fileId: string): Promise<void> {
       generationId: '', // Will be generated in the service
       fileId: fileId, // Pass file ID from Telegram
       roomDesignEffect,
+      effectObject: 'room design',
       prompt,
       chatId: ctx.chat?.id.toString() || '',
       messageId: statusMessage.message_id,

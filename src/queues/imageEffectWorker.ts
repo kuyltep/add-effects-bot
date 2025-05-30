@@ -140,6 +140,7 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
     logoEffect,
     bannerEffect,
     roomDesignEffect,
+    effectObject,
     prompt,
     apiProvider,
   } = job.data;
@@ -194,7 +195,7 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
         logoEffect,
         bannerEffect,
         roomDesignEffect,
-        prompt,
+        prompt
       );
     } else if (FAL_AI_EFFECTS.includes(effect)) {
       // Process with FAL AI
@@ -205,12 +206,10 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
         localFilePath,
         effect,
         resolution as Resolution,
-        job.data.logoEffect,
+        job.data.logoEffect
       );
     } else if (job.data.logoEffect || job.data.bannerEffect || job.data.roomDesignEffect) {
-
       const effect = job.data.logoEffect || job.data.bannerEffect || job.data.roomDesignEffect;
-      const effectType = effect.replace('/Effect$/', '');
 
       if (apiProvider === 'openai') {
         finalOutputPath = await editImageOpenAI(
@@ -219,15 +218,15 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
           resolution as Resolution,
           job.data.logoEffect,
           job.data.bannerEffect,
-          prompt,
+          prompt
         );
       } else if (apiProvider === 'gap') {
         finalOutputPath = await editImageWithAnotherAi(
           localFilePath,
           effect,
-          effectType,
+          effectObject,
           resolution as Resolution,
-          prompt,
+          prompt
         );
       }
     } else {

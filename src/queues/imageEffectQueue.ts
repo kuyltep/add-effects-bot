@@ -13,6 +13,7 @@ export interface ImageEffectJobData {
   logoEffect?: string;
   bannerEffect?: string;
   roomDesignEffect?: string;
+  effectObject?: string; // Type of object; logo, banner erc
   prompt?: string;
   chatId: string;
   messageId: number;
@@ -27,11 +28,7 @@ const QUEUE_NAME = 'image-effect-generation';
 const redisConnection = createRedisConnection();
 
 // API providers
-export type API_PROVIDER =
-  'openai' |
-  'fal-ai' |
-  'gap';
-
+export type API_PROVIDER = 'openai' | 'fal-ai' | 'gap';
 
 // Create the BullMQ queue instance
 export const imageEffectQueue = new Queue<ImageEffectJobData>(QUEUE_NAME, {

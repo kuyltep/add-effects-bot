@@ -77,7 +77,6 @@ async function showInitialOptions(ctx: MyContext): Promise<void> {
       [Markup.button.callback(stylizeLogoText, 'select_logo_styling')],
       [Markup.button.callback(stylizeBannerText, 'select_banner_styling')],
       [Markup.button.callback(stylizeRoomDesign, 'select_room_design')],
-
     ]).reply_markup,
   });
 }
@@ -556,7 +555,6 @@ initialOptionHandler.action('select_room_design', async ctx => {
   await ctx.answerCbQuery();
   return ctx.scene.enter('roomDesign', ctx.wizard.state);
 });
-
 
 initialOptionHandler.action('cancel_generation', async ctx => {
   await ctx.answerCbQuery();
