@@ -233,7 +233,7 @@ async function handlePhotoInput(ctx: MyContext, fileId: string): Promise<void> {
       messageId: statusMessage.message_id,
       language: language || ctx.i18n.locale || 'en',
       resolution: resolution,
-      apiProvider: 'gap',
+      apiProvider: 'openai',
     });
   } catch (error) {
     Logger.error(error, { context: 'queueImageGenerationJob', userId });

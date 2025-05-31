@@ -11,7 +11,6 @@ import { createRedisConnection, createRedisPublisher } from '../utils/redis';
 import { applyImageEffect } from '../services/fal-ai';
 import { isMainThread, parentPort, workerData } from 'worker_threads';
 import { createImageOpenAI, editImageOpenAI } from '../services/openai';
-import { editImageWithAnotherAi } from '../services/anotherAiApi';
 import { generateJointPhoto } from '../services/runway';
 
 // Constants
@@ -244,14 +243,9 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
           resolution as Resolution,
           job.data.logoEffect,
           job.data.bannerEffect,
-          prompt
-        );
-      } else if (apiProvider === 'gap') {
-        finalOutputPath = await editImageWithAnotherAi(
-          localFilePath,
-          effect,
-          effectObject,
-          resolution as Resolution,
+          job.data.roomDesignEffect,
+          job.data.jointPhotoEffect,
+          job.data.effectObject,
           prompt
         );
       } else if (apiProvider === 'runway') {

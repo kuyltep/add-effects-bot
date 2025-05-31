@@ -9,6 +9,9 @@ import FormData from 'form-data';
 // Base prompt template for consistent style transfer
 const BASE_PROMPT_TEMPLATE =
   'Take this (these) generative person(s) and create a new picture in {style} style. Please, preserve and transfer the facial features of the generative character(s) as much as possible into the new style.';
+const BASE_PROMPT_TEMPLATE_WITH_EFFECT =
+  'Create a stylized {effectType} with the following style properties: {styleProperties}. The input image should be used as the logo basis. Make sure the result maintains recognizability while applying the style.';
+
 
 // Style definitions for each effect
 const STYLE_DEFINITIONS = {
@@ -93,6 +96,9 @@ export async function editImageOpenAI(
   resolution: Resolution = 'SQUARE',
   logoEffect?: string,
   bannerEffect?: string,
+  roomDesignEffect?: string,
+  jointPhotoEffect?: string,
+  effectObject?: string,
   description?: string
 ): Promise<string> {
   try {
@@ -103,6 +109,10 @@ export async function editImageOpenAI(
 
     // Create a proper PNG version of the input image for OpenAI API
     const pngPath = await convertToPng(imagePath);
+
+    if (roomDesignEffect) {
+      return await editImageWithEffect(pngPath, roomDesignEffect, effectObject, resolution, description);
+    }
 
     // If this is a logo effect, use the logo styling prompt
     if (logoEffect) {
@@ -140,6 +150,49 @@ export async function editImageOpenAI(
   }
 }
 
+/**
+ * Processes logo with the specified effect style
+ */
+async function editImageWithEffect(
+  imagePath: string,
+  effect: string,
+  effectObject: string,
+  resolution: Resolution = 'SQUARE',
+  description?: string
+): Promise<string> {
+  try {
+
+    // Validate regular effect type
+    if (!effect) {
+      throw new Error('No effect specified');
+    }
+
+    // Load the effect JSON file
+    const effectFilePath = path.join(process.cwd(), 'src', 'prompts', `${effect}.json`);
+
+    if (!fs.existsSync(effectFilePath)) {
+      throw new Error(`Effect file not found: ${effectFilePath}`);
+    }
+
+    // Read and parse the effect JSON
+    const effectData = JSON.parse(fs.readFileSync(effectFilePath, 'utf8'));
+    effectData.description = description;
+
+    // Convert the effect properties into a string for the prompt
+
+    // Create the prompt with the style properties
+    const prompt = BASE_PROMPT_TEMPLATE_WITH_EFFECT.replace(
+      '{styleProperties}',
+      JSON.stringify(effectData)
+    ).replace('{effectType}', effectObject);
+
+    // Process with standard effects
+    return await editImageWithQuality(imagePath, prompt, 'medium', resolution);
+  } catch (error) {
+    Logger.error('Error editing image with OpenAI', { error });
+    throw error;
+  }
+}
 /**
  * Processes logo with the specified effect style
  */
