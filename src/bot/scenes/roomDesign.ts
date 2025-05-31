@@ -13,7 +13,9 @@ const ownPromptHandler = new Composer<MyContext>();
 export const roomDesignScene = new Scenes.WizardScene<MyContext>(
   'roomDesign',
   async ctx => {
-    ctx.session.fileId = undefined;
+    const state = ctx.wizard.state as GenerateWizardState;
+    state.generationData.prompt = undefined;
+    state.generationData.fileIds = undefined;
     try {
       await showRoomDesignEffectSelection(ctx);
       return ctx.wizard.next();
@@ -155,9 +157,10 @@ photoHandler.on('text', async ctx => {
 });
 
 ownPromptHandler.on('photo', async ctx => {
+  const state = ctx.wizard.state as GenerateWizardState;
   const photoSizes = ctx.message.photo;
   const largestPhoto = photoSizes[photoSizes.length - 1];
-  ctx.session.fileId = largestPhoto.file_id;
+  state.generationData.fileIds = [largestPhoto.file_id];
   await ctx.reply(ctx.i18n.t('bot:generate.send_prompt_for_design'));
 });
 
@@ -167,7 +170,8 @@ ownPromptHandler.on('document', async ctx => {
     await ctx.reply(ctx.i18n.t('bot:generate.not_an_image'));
     return;
   }
-  ctx.session.fileId = document.file_id;
+  const state = ctx.wizard.state as GenerateWizardState;
+  state.generationData.fileIds = [document.file_id];
   await ctx.reply(ctx.i18n.t('bot:generate.send_prompt_for_design'));
 });
 
@@ -178,10 +182,10 @@ ownPromptHandler.on('text', async ctx => {
   const state = ctx.wizard.state as GenerateWizardState;
   state.generationData.prompt = ctx.message.text;
 
-  if (ctx.session.fileId) {
+  if (state.generationData.fileIds) {
     // Clear image buffer even error occurs
-    const tempFileId = ctx.session.fileId;
-    ctx.session.fileId = undefined;
+    const tempFileId = state.generationData.fileIds[0];
+    state.generationData.fileIds = undefined;
     await handlePhotoInput(ctx, tempFileId);
   } else {
     await ctx.reply(ctx.i18n.t('bot:generate.send_photo_for_effect'));

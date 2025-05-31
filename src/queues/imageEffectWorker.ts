@@ -186,7 +186,7 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
       localFilePath = path.join(UPLOAD_DIR, 'temp');
     }
 
-    if (localFilePaths.length === 1) {
+    if (localFilePaths && localFilePaths.length === 1) {
       localFilePath = localFilePaths[0];
     }
 

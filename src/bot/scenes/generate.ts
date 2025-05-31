@@ -490,7 +490,8 @@ photoHandler.on('message', async ctx => {
 photoAndTextHandler.on('photo', async ctx => {
   const photoSizes = ctx.message.photo;
   const largestPhoto = photoSizes[photoSizes.length - 1];
-  ctx.session.fileId = largestPhoto.file_id;
+  const state = ctx.wizard.state as GenerateWizardState;
+  state.generationData.fileIds = [largestPhoto.file_id];
   await ctx.reply(ctx.i18n.t('bot:generate.banner_wait_for_description'));
 });
 
@@ -501,7 +502,8 @@ photoAndTextHandler.on('document', async ctx => {
     await ctx.reply(ctx.i18n.t('bot:generate.not_an_image'));
     return; // Stay in this step
   }
-  ctx.session.fileId = document.file_id;
+  const state = ctx.wizard.state as GenerateWizardState;
+  state.generationData.fileIds = [document.file_id];
   await ctx.reply(ctx.i18n.t('bot:generate.banner_wait_for_description'));
 });
 
@@ -513,10 +515,10 @@ photoAndTextHandler.on('text', async ctx => {
   const state = ctx.wizard.state as GenerateWizardState;
   state.generationData.prompt = ctx.message.text;
 
-  if (ctx.session.fileId) {
+  if (state.generationData.fileIds) {
     // Clear image buffer even error occurs
-    const tempFileId = ctx.session.fileId;
-    ctx.session.fileId = undefined;
+    const tempFileId = state.generationData.fileIds[0];
+    state.generationData.fileIds = undefined;
     await handlePhotoInput(ctx, tempFileId);
   } else {
     await handleTextInput(ctx);
@@ -573,7 +575,10 @@ export const generateScene = new Scenes.WizardScene<MyContext>(
   'generate',
   // Step 0: Initial check and options selection
   async ctx => {
-    ctx.session.fileId = undefined;
+    const state = ctx.wizard.state as GenerateWizardState;
+    state.generationData.prompt = undefined;
+    state.generationData.fileIds = undefined;
+
     const telegramId = ctx.from?.id.toString() || '';
     const initState = await initializeWizardState(ctx, telegramId);
     if (!initState || !initState.userData) {
