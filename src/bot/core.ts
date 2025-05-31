@@ -24,6 +24,7 @@ import path from 'path';
 import fetch from 'node-fetch';
 import { checkChannelSubscription } from './middleware/check-subscription';
 import { roomDesignScene } from './scenes/roomDesign';
+import { jointPhotoScene } from './scenes/jointPhoto';
 
 // Создаем инстанс бота
 export const bot = new Telegraf<MyContext>(process.env.TELEGRAM_BOT_TOKEN || '');
@@ -44,6 +45,7 @@ const scenes = [
   upgradeScene,
   videoEffectScene,
   roomDesignScene,
+  jointPhotoScene,
 ];
 
 // Создаем менеджер сцен

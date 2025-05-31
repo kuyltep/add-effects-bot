@@ -1130,6 +1130,19 @@
   dependencies:
     "@prisma/debug" "6.5.0"
 
+"@runwayml/sdk@^2.2.0":
+  version "2.2.0"
+  resolved "https://registry.yarnpkg.com/@runwayml/sdk/-/sdk-2.2.0.tgz#39a08415e1618bcacd7109e0889661a77f0f1155"
+  integrity sha512-2Yfu3wKNf0kRxHV0LGJBYMFIcLXoCWvZ0pJdMUIQSV21K4Y6XZBiUXoauCcfzVSb6Ahh42fnzhtXjElJprM4Sw==
+  dependencies:
+    "@types/node" "^18.11.18"
+    "@types/node-fetch" "^2.6.4"
+    abort-controller "^3.0.0"
+    agentkeepalive "^4.2.1"
+    form-data-encoder "1.7.2"
+    formdata-node "^4.3.2"
+    node-fetch "^2.6.7"
+
 "@smithy/abort-controller@^4.0.2":
   version "4.0.2"
   resolved "https://registry.yarnpkg.com/@smithy/abort-controller/-/abort-controller-4.0.2.tgz#36a23e8cc65fc03cacb6afa35dfbfd319c560c6b"

@@ -12,6 +12,7 @@ import { applyImageEffect } from '../services/fal-ai';
 import { isMainThread, parentPort, workerData } from 'worker_threads';
 import { createImageOpenAI, editImageOpenAI } from '../services/openai';
 import { editImageWithAnotherAi } from '../services/anotherAiApi';
+import { generateJointPhoto } from '../services/runway';
 
 // Constants
 const QUEUE_NAME = 'image-effect-generation';
@@ -150,6 +151,7 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
     logoEffect,
     bannerEffect,
     roomDesignEffect,
+    jointPhotoEffect,
     effectObject,
     prompt,
     apiProvider,
@@ -178,7 +180,7 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
       })
     );
 
-    // 2. Download the original image from Telegram via bot core or create
+    // 2. Download the original images from Telegram via bot core or create
     if (fileIds) {
       localFilePaths = await downloadMultipleTelegramFiles(fileIds);
     } else {
@@ -196,7 +198,7 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
         chatId,
         messageId,
         text: getMessage('applying_effect', language, {
-          effect: effect || logoEffect || bannerEffect || roomDesignEffect,
+          effect: effect || logoEffect || bannerEffect || roomDesignEffect || jointPhotoEffect,
         }),
       })
     );
@@ -223,8 +225,17 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
         resolution as Resolution,
         job.data.logoEffect
       );
-    } else if (job.data.logoEffect || job.data.bannerEffect || job.data.roomDesignEffect) {
-      const effect = job.data.logoEffect || job.data.bannerEffect || job.data.roomDesignEffect;
+    } else if (
+      job.data.logoEffect ||
+      job.data.bannerEffect ||
+      job.data.roomDesignEffect ||
+      job.data.jointPhotoEffect
+    ) {
+      const effect =
+        job.data.logoEffect ||
+        job.data.bannerEffect ||
+        job.data.roomDesignEffect ||
+        job.data.jointPhotoEffect;
 
       if (apiProvider === 'openai') {
         finalOutputPath = await editImageOpenAI(
@@ -242,6 +253,12 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
           effectObject,
           resolution as Resolution,
           prompt
+        );
+      } else if (apiProvider === 'runway') {
+        finalOutputPath = await generateJointPhoto(
+          localFilePaths,
+          prompt,
+          resolution as Resolution
         );
       }
     } else {

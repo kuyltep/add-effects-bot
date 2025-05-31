@@ -68,6 +68,7 @@ async function showInitialOptions(ctx: MyContext): Promise<void> {
   const stylizeLogoText = ctx.i18n.t('bot:generate.stylize_logo');
   const stylizeBannerText = ctx.i18n.t('bot:generate.stylize_banner');
   const stylizeRoomDesign = ctx.i18n.t('bot:generate.room_design');
+  const jointPhoto = ctx.i18n.t('bot:generate.joint_photo');
 
   await ctx.reply(ctx.i18n.t('bot:generate.select_option'), {
     parse_mode: 'HTML',
@@ -77,6 +78,7 @@ async function showInitialOptions(ctx: MyContext): Promise<void> {
       [Markup.button.callback(stylizeLogoText, 'select_logo_styling')],
       [Markup.button.callback(stylizeBannerText, 'select_banner_styling')],
       [Markup.button.callback(stylizeRoomDesign, 'select_room_design')],
+      [Markup.button.callback(jointPhoto, 'select_joint_photo')],
     ]).reply_markup,
   });
 }
@@ -554,6 +556,11 @@ initialOptionHandler.action('select_banner_styling', async ctx => {
 initialOptionHandler.action('select_room_design', async ctx => {
   await ctx.answerCbQuery();
   return ctx.scene.enter('roomDesign', ctx.wizard.state);
+});
+
+initialOptionHandler.action('select_joint_photo', async ctx => {
+  await ctx.answerCbQuery();
+  return ctx.scene.enter('jointPhoto', ctx.wizard.state);
 });
 
 initialOptionHandler.action('cancel_generation', async ctx => {

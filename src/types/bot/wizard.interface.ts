@@ -125,7 +125,7 @@ export interface GenerationData {
   negativePrompt?: string;
   seed?: number;
   batchSize?: number;
-  fileId?: string;
+  fileIds?: string[];
   hasPhoto?: boolean;
   effect?: EffectType;
   logoEffect?: string; // For logo styling effects

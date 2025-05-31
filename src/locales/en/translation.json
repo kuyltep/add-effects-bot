@@ -117,8 +117,15 @@
       "room_design_effect_classic": "🏛️ Make the furniture 'Classic'",
       "send_room_for_effect": "📸 Great! Now send a photo of the room",
       "send_room_not_prompt": "A photo is required for this to work. Please send a picture of the room ✨",
-      "send_prompt_for_design": "Enter a prompt describing what you'd like to do with your photo. We'll try to preserve as many original details as possible 👇🏻"
-    
+      "send_prompt_for_design": "Enter a prompt describing what you'd like to do with your photo. We'll try to preserve as many original details as possible 👇🏻",
+      "joint_photo_effect_own_prompt": "🎨 Enter your own prompt",
+      "back_to_generate": "↩️ Back",
+      "joint_photo_send_photo_for_effect": "📸 Great! Now send a couple of photos you want to combine, and a description of what you want to see on the photo",
+      "already_have_enough_photos": "⚠️ I already have enough photos. This photo will not be used for generation",
+      "already_have_prompt": "⚠️ You already entered a prompt. This will be used for generation only for the first prompt",
+      "joint_photo_get_photo": "👍 Great! I received your photo",
+      "joint_photo_get_prompt": "👌 Great! I received your description",
+      "joint_photo_wrong_message": "❌ I don't understand your message. Please send a photo or description"
     },
     "video": {
       "user_not_found": "User not found. Please start the bot again with /start.",
