@@ -6,6 +6,8 @@ import { saveImageBuffer } from './sharp-service';
 import { Resolution } from '../types/bot';
 import { Logger } from '../utils/rollbar.logger';
 
+const PHOTOS_AMOUNT = 2;
+
 const client = new RunwayML({
   apiKey: process.env.RUNWAYML_API_KEY,
 });
@@ -16,7 +18,8 @@ function getBase64Image(imagePath: string) {
 
   // Convert to base64
   const base64String = imageBuffer.toString('base64');
-  return `data:image/${path.extname(imagePath).slice(1)};base64,${base64String}`;
+  const ext = path.extname(imagePath).slice(1).toLowerCase() || 'jpeg';
+  return `data:image/${ext};base64,${base64String}`;
 }
 
 export async function generateJointPhoto(
@@ -25,12 +28,16 @@ export async function generateJointPhoto(
   resolution: Resolution
 ): Promise<string> {
   const base64Images = imagePaths.map(getBase64Image);
+  if (imagePaths.length !== PHOTOS_AMOUNT) {
+    throw new Error(`Exactly ${PHOTOS_AMOUNT} images are required for joint photo generation`);
+  }
+  const ratio = resolution === 'SQUARE' ? '1024:1024' : resolution === 'VERTICAL' ? '1080:1920' : '1920:1080';
   try {
     // Create a new text-to-image task using the "gen4_image" model
     const textToImage = await client.textToImage.create({
       model: 'gen4_image',
       promptText: `${prompt}. Use photo @first_photo and @second_photo as reference.`,
-      ratio: '1920:1080',
+      ratio: ratio,
       referenceImages: [
         {
           uri: base64Images[0],
@@ -69,8 +76,7 @@ export async function generateJointPhoto(
     const resultBuffer = Buffer.from(buffer);
 
     const outputDir = path.dirname(imagePaths[0]);
-    const outputPath = path.join(process.cwd(), outputDir, `processed_image.jpg`);
-
+    const outputPath = path.resolve(outputDir, 'processed_image.jpg');
     // Save the result
     await saveImageBuffer(resultBuffer, outputPath, 'jpeg', 100);
 

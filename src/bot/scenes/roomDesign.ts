@@ -20,7 +20,7 @@ export const roomDesignScene = new Scenes.WizardScene<MyContext>(
       await showRoomDesignEffectSelection(ctx);
       return ctx.wizard.next();
     } catch (error) {
-      console.error('Error in roomDesign scene:', error);
+      Logger.error('Error in roomDesign scene:', error);
       await handleSceneError(ctx, error, 'roomDesign');
     }
   },
