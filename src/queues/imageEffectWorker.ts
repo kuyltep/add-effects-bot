@@ -157,7 +157,7 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
   } = job.data;
 
   let localFilePath: string | null = null;
-  let localFilePaths: string[] = null;
+  let localFilePaths: string[] = [  ];
   let finalOutputPath: string | null = null;
 
   try {

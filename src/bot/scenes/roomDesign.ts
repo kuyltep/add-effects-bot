@@ -182,8 +182,7 @@ ownPromptHandler.on('text', async ctx => {
   const state = ctx.wizard.state as GenerateWizardState;
   state.generationData.prompt = ctx.message.text;
 
-  if (state.generationData.fileIds) {
-    // Clear image buffer even error occurs
+  if (state.generationData.fileIds && state.generationData.fileIds.length > 0) {    // Clear image buffer even error occurs
     const tempFileId = state.generationData.fileIds[0];
     state.generationData.fileIds = undefined;
     await handlePhotoInput(ctx, tempFileId);
