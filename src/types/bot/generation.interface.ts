@@ -31,7 +31,7 @@ export interface GenerationData {
   /** Password for registration purposes */
   password?: string;
   /** File ID of the photo to restore */
-  fileId?: string;
+  fileIds?: string[];
   /** Whether a photo was provided */
   hasPhoto?: boolean;
   /** Whether the photo has creases that need removal */

@@ -23,6 +23,8 @@ import { createMainKeyboardMiddleware } from '../utils/sceneHelpers';
 import path from 'path';
 import fetch from 'node-fetch';
 import { checkChannelSubscription } from './middleware/check-subscription';
+import { roomDesignScene } from './scenes/roomDesign';
+import { jointPhotoScene } from './scenes/jointPhoto';
 
 // Создаем инстанс бота
 export const bot = new Telegraf<MyContext>(process.env.TELEGRAM_BOT_TOKEN || '');
@@ -42,6 +44,8 @@ const scenes = [
   videoScene,
   upgradeScene,
   videoEffectScene,
+  roomDesignScene,
+  jointPhotoScene,
 ];
 
 // Создаем менеджер сцен
@@ -529,7 +533,7 @@ async function sendEffectResults(data) {
 
 export async function stopBot() {
   console.log('Stopping bot...');
-  
+
   // Clear webhook if it exists to prevent conflicts
   try {
     await bot.telegram.deleteWebhook({ drop_pending_updates: false });
@@ -597,6 +601,8 @@ export async function startBot() {
       'video_effect',
       async ctx => await ctx.scene.enter('videoEffect', { source: 'command' })
     );
+    bot.command('room_design', async ctx => await ctx.scene.enter('roomDesign'));
+    bot.command('joint_photo', async ctx => await ctx.scene.enter('jointPhoto'));
 
     // Добавляем обработчик для кнопки создания еще
     bot.action('generate_more', async ctx => {
@@ -640,6 +646,11 @@ export async function startBot() {
       await ctx.scene.enter('videoEffect', { source: 'command' });
     });
 
+    bot.action('room_design', async ctx => {
+      await ctx.answerCbQuery();
+      await ctx.scene.enter('roomDesign');
+    });
+
     // Adding a handler for video effects from generate scene
     bot.action('video_effect_from_generate', async ctx => {
       await ctx.answerCbQuery();
@@ -652,7 +663,7 @@ export async function startBot() {
 
     if (useWebhook && apiBaseUrl) {
       console.log('Starting bot in webhook mode...');
-      
+
       try {
         await bot.telegram.deleteWebhook({ drop_pending_updates: true });
         console.log('Cleared existing webhook');
@@ -661,16 +672,16 @@ export async function startBot() {
       }
 
       const webhookUrl = `${apiBaseUrl}/api/bot/webhook`;
-      
+
       try {
         const result = await bot.telegram.setWebhook(webhookUrl, {
           allowed_updates: ['message', 'callback_query', 'inline_query'],
           drop_pending_updates: true,
         });
-        
+
         if (result) {
           console.log(`Webhook set successfully: ${webhookUrl}`);
-          
+
           const webhookInfo = await bot.telegram.getWebhookInfo();
           console.log('Webhook info:', {
             url: webhookInfo.url,
@@ -686,7 +697,7 @@ export async function startBot() {
       }
     } else {
       console.log('Starting bot in polling mode...');
-      
+
       try {
         await bot.telegram.deleteWebhook({ drop_pending_updates: true });
         console.log('Cleared webhook for polling mode');
@@ -709,6 +720,8 @@ export async function startBot() {
       { command: 'video', description: 'Generate video from restored photo' },
       { command: 'upgrade', description: 'Enhance photo quality' },
       { command: 'video_effect', description: 'Apply video effects to photo' },
+      { command: 'room_design', description: 'Apply room design' },
+      { command: 'joint_photo', description: 'Apply joint photo' },
     ]);
 
     console.log(`Bot started successfully in ${useWebhook ? 'webhook' : 'polling'} mode`);

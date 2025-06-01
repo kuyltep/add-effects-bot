@@ -125,7 +125,7 @@ export async function queueImageGenerationJob(
   } catch (error) {
     Logger.error(`Error queueing image effect job: ${error.message}`, {
       userId: data.userId,
-      fileId: data.fileId,
+      fileIds: data.fileIds,
       effect: data.effect,
     });
     throw error;
@@ -169,7 +169,7 @@ export async function queueImageFromTextGenerationJob(
   } catch (error) {
     Logger.error(`Error queueing image effect job: ${error.message}`, {
       userId: data.userId,
-      fileId: data.fileId,
+      fileIds: data.fileIds,
       effect: data.effect,
     });
     throw error;

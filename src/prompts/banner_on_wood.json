@@ -1,0 +1,39 @@
+{
+  "style": "photorealistic 3D render",
+  "material": "premium hardwood with natural grain patterns",
+  "wood_type": {
+    "species": "oak",
+    "color": "natural wood tone of selected species",
+    "grain": "authentic grain pattern with visible texture",
+    "finish": "satin hand-rubbed oil finish"
+  },
+  "logo_treatment": {
+    "carving_style": "clean precision carved with slight hand-tool texture",
+    "depth": "variable relief depth for dimensional interest",
+    "edges": "slightly rounded and polished",
+    "background": "subtly recessed flat wood surface"
+  },
+  "craftsmanship_details": {
+    "tool_marks": "subtle suggestion of hand crafting",
+    "grain_interaction": "logo elements follow natural wood grain",
+    "joinery": "seamless construction with hidden attachment points",
+    "finish_quality": "smooth hand-rubbed surface with natural luster"
+  },
+  "lighting": {
+    "type": "soft natural lighting",
+    "direction": "top-left at 45 degrees",
+    "shadows": "soft, warm shadows enhancing dimension",
+    "environment": "suggestion of artisan workshop"
+  },
+  "composition": {
+    "angle": "slight overhead angle showcasing dimension",
+    "context": "minimal suggestion of craftsman environment",
+    "scale": "intimate close-up emphasizing detail"
+  },
+  "post_processing": {
+    "warmth": "enhanced warm tones of natural wood",
+    "texture": "enhanced grain detail without exaggeration",
+    "contrast": "natural, not excessive",
+    "mood": "organic, authentic, timeless"
+  }
+}

@@ -47,6 +47,7 @@ const logoEffectOptions = [
   'organic',
 ];
 
+// Banner effect options
 const bannerEffectOptions = [
   'banner_without_effects',
   'banner_in_the_haze',
@@ -66,6 +67,8 @@ async function showInitialOptions(ctx: MyContext): Promise<void> {
   const videoEffectsText = ctx.i18n.t('bot:generate.effect_video');
   const stylizeLogoText = ctx.i18n.t('bot:generate.stylize_logo');
   const stylizeBannerText = ctx.i18n.t('bot:generate.stylize_banner');
+  const stylizeRoomDesign = ctx.i18n.t('bot:generate.room_design');
+  const jointPhoto = ctx.i18n.t('bot:generate.joint_photo');
 
   await ctx.reply(ctx.i18n.t('bot:generate.select_option'), {
     parse_mode: 'HTML',
@@ -74,6 +77,8 @@ async function showInitialOptions(ctx: MyContext): Promise<void> {
       [Markup.button.callback(videoEffectsText, 'select_video_effects')],
       [Markup.button.callback(stylizeLogoText, 'select_logo_styling')],
       [Markup.button.callback(stylizeBannerText, 'select_banner_styling')],
+      [Markup.button.callback(stylizeRoomDesign, 'select_room_design')],
+      [Markup.button.callback(jointPhoto, 'select_joint_photo')],
     ]).reply_markup,
   });
 }
@@ -190,6 +195,9 @@ async function showLogoEffectSelection(ctx: MyContext): Promise<void> {
   }
 }
 
+/**
+ * Sends the banner effect selection message and keyboard.
+ */
 async function showBannerEffectSelection(ctx: MyContext): Promise<void> {
   // Create localized button labels
   const effectLabels = {
@@ -378,7 +386,7 @@ async function handlePhotoInput(ctx: MyContext, fileId: string): Promise<void> {
     return exitWithError(ctx, 'bot:errors.general');
   }
 
-  const { effect, logoEffect, bannerEffect, description } = state.generationData;
+  const { effect, logoEffect, bannerEffect, prompt } = state.generationData;
   const { id: userId, language } = state.userData;
   const { resolution } = state.userSettings;
 
@@ -391,15 +399,16 @@ async function handlePhotoInput(ctx: MyContext, fileId: string): Promise<void> {
     await queueImageGenerationJob({
       userId,
       generationId: '', // Will be generated in the service
-      fileId: fileId, // Pass file ID from Telegram
+      fileIds: [fileId], // Pass file ID from Telegram
       effect,
       logoEffect, // Pass the logo effect if it exists
       bannerEffect,
-      description,
+      prompt,
       chatId: ctx.chat?.id.toString() || '',
       messageId: statusMessage.message_id,
       language: language || ctx.i18n.locale || 'en',
       resolution: resolution,
+      apiProvider: 'openai',
     });
   } catch (error) {
     Logger.error(error, { context: 'queueImageGenerationJob', userId });
@@ -417,7 +426,7 @@ async function handleTextInput(ctx: MyContext): Promise<void> {
     return exitWithError(ctx, 'bot:errors.general');
   }
 
-  const { effect, logoEffect, bannerEffect, description } = state.generationData;
+  const { effect, logoEffect, bannerEffect, prompt } = state.generationData;
   const { id: userId, language } = state.userData;
 
   try {
@@ -431,11 +440,12 @@ async function handleTextInput(ctx: MyContext): Promise<void> {
       generationId: '', // Will be generated in the service
       effect,
       logoEffect, // Pass the logo effect if it exists
-      bannerEffect,
-      description,
+      bannerEffect, // Pass the banner effect if it exists
+      prompt, // Pass the prompt if it exists
       chatId: ctx.chat?.id.toString() || '',
       messageId: statusMessage.message_id,
       language: language || ctx.i18n.locale || 'en',
+      apiProvider: 'openai',
     });
   } catch (error) {
     Logger.error(error, { context: 'queueImageGenerationJob', userId });
@@ -480,7 +490,8 @@ photoHandler.on('message', async ctx => {
 photoAndTextHandler.on('photo', async ctx => {
   const photoSizes = ctx.message.photo;
   const largestPhoto = photoSizes[photoSizes.length - 1];
-  ctx.session.fileId = largestPhoto.file_id;
+  const state = ctx.wizard.state as GenerateWizardState;
+  state.generationData.fileIds = [largestPhoto.file_id];
   await ctx.reply(ctx.i18n.t('bot:generate.banner_wait_for_description'));
 });
 
@@ -491,7 +502,8 @@ photoAndTextHandler.on('document', async ctx => {
     await ctx.reply(ctx.i18n.t('bot:generate.not_an_image'));
     return; // Stay in this step
   }
-  ctx.session.fileId = document.file_id;
+  const state = ctx.wizard.state as GenerateWizardState;
+  state.generationData.fileIds = [document.file_id];
   await ctx.reply(ctx.i18n.t('bot:generate.banner_wait_for_description'));
 });
 
@@ -501,12 +513,12 @@ photoAndTextHandler.on('text', async ctx => {
     return exitScene(ctx, 'bot:generate.cancelled');
   }
   const state = ctx.wizard.state as GenerateWizardState;
-  state.generationData.description = ctx.message.text;
+  state.generationData.prompt = ctx.message.text;
 
-  if (ctx.session.fileId) {
+  if (state.generationData.fileIds) {
     // Clear image buffer even error occurs
-    const tempFileId = ctx.session.fileId;
-    ctx.session.fileId = undefined;
+    const tempFileId = state.generationData.fileIds[0];
+    state.generationData.fileIds = undefined;
     await handlePhotoInput(ctx, tempFileId);
   } else {
     await handleTextInput(ctx);
@@ -541,6 +553,16 @@ initialOptionHandler.action('select_banner_styling', async ctx => {
   await ctx.answerCbQuery();
   await showBannerEffectSelection(ctx);
   return ctx.wizard.selectStep(5); // Move to banner effect selection handler step
+});
+
+initialOptionHandler.action('select_room_design', async ctx => {
+  await ctx.answerCbQuery();
+  return ctx.scene.enter('roomDesign', ctx.wizard.state);
+});
+
+initialOptionHandler.action('select_joint_photo', async ctx => {
+  await ctx.answerCbQuery();
+  return ctx.scene.enter('jointPhoto', ctx.wizard.state);
 });
 
 initialOptionHandler.action('cancel_generation', async ctx => {

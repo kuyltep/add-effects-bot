@@ -11,6 +11,7 @@ import { createRedisConnection, createRedisPublisher } from '../utils/redis';
 import { applyImageEffect } from '../services/fal-ai';
 import { isMainThread, parentPort, workerData } from 'worker_threads';
 import { createImageOpenAI, editImageOpenAI } from '../services/openai';
+import { generateJointPhoto } from '../services/runway';
 
 // Constants
 const QUEUE_NAME = 'image-effect-generation';
@@ -123,6 +124,16 @@ async function downloadTelegramFile(fileId: string): Promise<string> {
 
   throw new Error(`Timed out after ${maxWaitTime}ms waiting for file download`);
 }
+
+/**
+ * Downloads multiple files from Telegram using the bot core via Redis.
+ * @param fileIds - Array of Telegram file IDs.
+ * @returns Array of local paths where the files were downloaded.
+ */
+async function downloadMultipleTelegramFiles(fileIds: string[]): Promise<string[]> {
+  return Promise.all(fileIds.map(fileId => downloadTelegramFile(fileId)));
+}
+
 /**
  * Processes an image effect generation job.
  */
@@ -130,18 +141,23 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
   const {
     generationId,
     userId,
-    fileId,
+    fileIds,
     effect,
     chatId,
     messageId,
     language,
     resolution = 'SQUARE',
     logoEffect,
-    description,
     bannerEffect,
+    roomDesignEffect,
+    jointPhotoEffect,
+    effectObject,
+    prompt,
+    apiProvider,
   } = job.data;
 
   let localFilePath: string | null = null;
+  let localFilePaths: string[] = [  ];
   let finalOutputPath: string | null = null;
 
   try {
@@ -163,11 +179,15 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
       })
     );
 
-    // 2. Download the original image from Telegram via bot core or create
-    if (fileId) {
-      localFilePath = await downloadTelegramFile(fileId);
+    // 2. Download the original images from Telegram via bot core or create
+    if (fileIds) {
+      localFilePaths = await downloadMultipleTelegramFiles(fileIds);
     } else {
       localFilePath = path.join(UPLOAD_DIR, 'temp');
+    }
+
+    if (localFilePaths && localFilePaths.length === 1) {
+      localFilePath = localFilePaths[0];
     }
 
     // 3. Apply effect based on type
@@ -177,25 +197,26 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
         chatId,
         messageId,
         text: getMessage('applying_effect', language, {
-          effect: effect || logoEffect || bannerEffect,
+          effect: effect || logoEffect || bannerEffect || roomDesignEffect || jointPhotoEffect,
         }),
       })
     );
 
     // Generate image with OpenAI service
-    if (!fileId) {
+    if (!fileIds) {
       finalOutputPath = await createImageOpenAI(
         localFilePath,
         effect,
         resolution as Resolution,
         logoEffect,
         bannerEffect,
-        description
+        roomDesignEffect,
+        prompt
       );
     } else if (FAL_AI_EFFECTS.includes(effect)) {
       // Process with FAL AI
       finalOutputPath = await applyImageEffect(localFilePath, effect, resolution as Resolution);
-    } else if (OPENAI_EFFECTS.includes(effect)) {
+    } else if (OPENAI_EFFECTS.includes(effect) && apiProvider === 'openai') {
       // Pass the resolution to OpenAI service
       finalOutputPath = await editImageOpenAI(
         localFilePath,
@@ -203,24 +224,37 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
         resolution as Resolution,
         job.data.logoEffect
       );
-    } else if (job.data.logoEffect) {
-      // Process logo effects
-      finalOutputPath = await editImageOpenAI(
-        localFilePath,
-        null,
-        resolution as Resolution,
-        job.data.logoEffect
-      );
-    } else if (job.data.bannerEffect) {
-      // Process logo effects
-      finalOutputPath = await editImageOpenAI(
-        localFilePath,
-        null,
-        resolution as Resolution,
-        undefined,
-        job.data.bannerEffect,
-        description
-      );
+    } else if (
+      job.data.logoEffect ||
+      job.data.bannerEffect ||
+      job.data.roomDesignEffect ||
+      job.data.jointPhotoEffect 
+    ) {
+      const effect =
+        job.data.logoEffect ||
+        job.data.bannerEffect ||
+        job.data.roomDesignEffect ||
+        job.data.jointPhotoEffect;
+
+      if (apiProvider === 'openai') {
+        finalOutputPath = await editImageOpenAI(
+          localFilePath,
+          effect,
+          resolution as Resolution,
+          job.data.logoEffect,
+          job.data.bannerEffect,
+          job.data.roomDesignEffect,
+          job.data.jointPhotoEffect,
+          job.data.effectObject,
+          prompt
+        );
+      } else if (apiProvider === 'runway') {
+        finalOutputPath = await generateJointPhoto(
+          localFilePaths,
+          prompt,
+          resolution as Resolution
+        );
+      }
     } else {
       throw new Error(`Unsupported effect type: ${effect}`);
     }
@@ -304,7 +338,7 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
   } finally {
     try {
       // Clean up temporary downloaded file
-      if (localFilePath && fileId) {
+      if (localFilePath && fileIds) {
         await fs
           .unlink(localFilePath)
           .catch(unlinkErr =>

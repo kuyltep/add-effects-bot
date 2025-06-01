@@ -8,21 +8,28 @@ import { createRedisConnection } from '../utils/redis';
 export interface ImageEffectJobData {
   generationId: string;
   userId: string;
-  fileId?: string;
+  fileIds?: string[];
   effect?: EffectType;
   logoEffect?: string;
   bannerEffect?: string;
-  description?: string;
+  roomDesignEffect?: string;
+  jointPhotoEffect?: string;
+  effectObject?: string; // Type of object; logo, banner erc
+  prompt?: string;
   chatId: string;
   messageId: number;
   language: string;
   resolution?: string;
+  apiProvider: API_PROVIDER;
 }
 
 const QUEUE_NAME = 'image-effect-generation';
 
 // Create a Redis connection using utility function
 const redisConnection = createRedisConnection();
+
+// API providers
+export type API_PROVIDER = 'openai' | 'fal-ai' | 'runway' | 'gap';
 
 // Create the BullMQ queue instance
 export const imageEffectQueue = new Queue<ImageEffectJobData>(QUEUE_NAME, {
