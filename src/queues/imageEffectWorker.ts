@@ -228,7 +228,7 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
       job.data.logoEffect ||
       job.data.bannerEffect ||
       job.data.roomDesignEffect ||
-      job.data.jointPhotoEffect
+      job.data.jointPhotoEffect 
     ) {
       const effect =
         job.data.logoEffect ||

@@ -602,6 +602,7 @@ export async function startBot() {
       async ctx => await ctx.scene.enter('videoEffect', { source: 'command' })
     );
     bot.command('room_design', async ctx => await ctx.scene.enter('roomDesign'));
+    bot.command('joint_photo', async ctx => await ctx.scene.enter('jointPhoto'));
 
     // Добавляем обработчик для кнопки создания еще
     bot.action('generate_more', async ctx => {
@@ -720,6 +721,7 @@ export async function startBot() {
       { command: 'upgrade', description: 'Enhance photo quality' },
       { command: 'video_effect', description: 'Apply video effects to photo' },
       { command: 'room_design', description: 'Apply room design' },
+      { command: 'joint_photo', description: 'Apply joint photo' },
     ]);
 
     console.log(`Bot started successfully in ${useWebhook ? 'webhook' : 'polling'} mode`);

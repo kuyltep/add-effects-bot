@@ -219,6 +219,11 @@ async function handlePhotoInput(ctx: MyContext, fileId: string): Promise<void> {
   const { id: userId, language } = state.userData;
   const { resolution } = state.userSettings;
 
+  if (!roomDesignEffect) {
+    Logger.warn('Room design effect not set in photo handler', { userId: ctx.from?.id });
+    return exitWithError(ctx, 'bot:errors.general');
+  }
+
   try {
     // Send confirmation and queue the job
     const statusMessage = await ctx.reply(ctx.i18n.t('bot:generate.processing_queued'), {
