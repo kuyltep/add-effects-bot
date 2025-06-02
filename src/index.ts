@@ -20,6 +20,8 @@ import adminRoutes from './routes/admin';
 import botRoutes from './routes/bot';
 import healthRoutes from './routes/health';
 import { Logger } from './utils/rollbar.logger';
+import { disconnectPrisma } from './utils/prisma';
+import { closeAllRedisConnections } from './utils/redis';
 import fs from 'fs';
 
 /**
@@ -32,6 +34,7 @@ const serviceState = {
   server: null as FastifyInstance | null,
   botHealthCheckInterval: null as NodeJS.Timeout | null,
   isBotRestarting: false,
+  isShuttingDown: false, // Add flag to prevent multiple shutdown attempts
 };
 
 /**
@@ -217,6 +220,13 @@ async function initializeWorkers() {
  * Graceful shutdown of all services
  */
 async function shutdownServices() {
+  // Prevent multiple shutdown attempts
+  if (serviceState.isShuttingDown) {
+    console.log('Shutdown already in progress, skipping...');
+    return;
+  }
+
+  serviceState.isShuttingDown = true;
   let shutdownSuccessful = true;
 
   console.log('Gracefully shutting down services...');
@@ -266,6 +276,22 @@ async function shutdownServices() {
     }
   }
 
+  // Close all Redis connections
+  try {
+    await closeAllRedisConnections();
+  } catch (err) {
+    Logger.error('Error closing Redis connections:', err);
+    shutdownSuccessful = false;
+  }
+
+  // Close Prisma connection
+  try {
+    await disconnectPrisma();
+  } catch (err) {
+    Logger.error('Error disconnecting Prisma:', err);
+    shutdownSuccessful = false;
+  }
+
   // Close the server
   if (serviceState.server) {
     try {
@@ -284,6 +310,12 @@ async function shutdownServices() {
     console.warn('Some services encountered errors during shutdown');
   }
 
+  // Force exit after a timeout
+  setTimeout(() => {
+    console.log('Force exiting application');
+    process.exit(shutdownSuccessful ? 0 : 1);
+  }, 2000);
+
   return shutdownSuccessful;
 }
 
@@ -295,13 +327,13 @@ function registerSignalHandlers() {
   process.once('SIGINT', shutdownServices);
   process.once('SIGTERM', shutdownServices);
 
-  // Handle uncaught exceptions and unhandled rejections
-  process.on('uncaughtException', error => {
+  // Handle uncaught exceptions and unhandled rejections - use once to prevent loops
+  process.once('uncaughtException', error => {
     Logger.critical('Uncaught exception:', error);
     shutdownServices();
   });
 
-  process.on('unhandledRejection', (reason, promise) => {
+  process.once('unhandledRejection', (reason, promise) => {
     Logger.critical('Unhandled rejection at:', promise);
     shutdownServices();
   });

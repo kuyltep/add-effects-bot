@@ -542,36 +542,8 @@ export async function stopBot() {
     console.warn('Failed to clear webhook during shutdown:', error);
   }
 
-  // Ensure Redis subscriber exists before trying to unsubscribe and quit
-  if (redisSubscriber) {
-    try {
-      await redisSubscriber.unsubscribe();
-      await redisSubscriber.quit();
-      console.log('Redis subscriber disconnected');
-    } catch (error) {
-      console.error('Error disconnecting Redis subscriber:', error);
-    }
-  }
-
-  // Ensure Redis publisher exists before trying to quit
-  if (redisPublisher) {
-    try {
-      await redisPublisher.quit();
-      console.log('Redis publisher disconnected');
-    } catch (error) {
-      console.error('Error disconnecting Redis publisher:', error);
-    }
-  }
-
-  // Ensure Redis connection exists before trying to quit
-  if (redisConnection) {
-    try {
-      await redisConnection.quit();
-      console.log('Redis connection disconnected');
-    } catch (error) {
-      console.error('Error disconnecting Redis connection:', error);
-    }
-  }
+  // Note: Redis connections are now managed centrally via closeAllRedisConnections()
+  // No need to manually close them here
 
   // Stop the bot instance
   bot.stop();

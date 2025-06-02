@@ -12,14 +12,22 @@ if (!redisUrl) {
 
 // Connection options
 const connectionOptions = {
-  maxRetriesPerRequest: null,
+  maxRetriesPerRequest: 1,
   enableReadyCheck: true,
-  family: 6,
   connectTimeout: 10000,
+  lazyConnect: true,
+  // Disable automatic reconnection on shutdown
   retryStrategy: (times: number) => {
-    return Math.min(times * 50, 2000);
+    // Only retry a few times, then give up
+    if (times > 3) {
+      return null; // Stop retrying
+    }
+    return Math.min(times * 1000, 3000);
   },
 };
+
+// Track all Redis connections for cleanup
+const activeConnections = new Set<Redis>();
 
 /**
  * Creates and returns a general Redis connection.
@@ -30,6 +38,14 @@ export function createRedisConnection(): Redis {
 
   const connection = new Redis(redisUrl, connectionOptions);
   connection.on('error', err => Logger.error(err, { context: 'Redis Connection' }));
+
+  // Track the connection
+  activeConnections.add(connection);
+
+  // Remove from tracking when closed
+  connection.on('close', () => {
+    activeConnections.delete(connection);
+  });
 
   return connection;
 }
@@ -44,6 +60,14 @@ export function createRedisSubscriber(): Redis {
   const subscriber = new Redis(redisUrl, connectionOptions);
   subscriber.on('error', err => Logger.error(err, { context: 'Redis Subscriber' }));
 
+  // Track the connection
+  activeConnections.add(subscriber);
+
+  // Remove from tracking when closed
+  subscriber.on('close', () => {
+    activeConnections.delete(subscriber);
+  });
+
   return subscriber;
 }
 
@@ -56,6 +80,14 @@ export function createRedisPublisher(): Redis {
 
   const publisher = new Redis(redisUrl, connectionOptions);
   publisher.on('error', err => Logger.error(err, { context: 'Redis Publisher' }));
+
+  // Track the connection
+  activeConnections.add(publisher);
+
+  // Remove from tracking when closed
+  publisher.on('close', () => {
+    activeConnections.delete(publisher);
+  });
 
   return publisher;
 }
@@ -95,23 +127,43 @@ export async function publishBatch(
   }
 }
 
-// Handle shutdown
-process.on('beforeExit', async () => {
-  if (redisUrl) {
-    const connection = createRedisConnection();
-    await connection.quit();
-    console.log('Redis connection closed');
-  }
+/**
+ * Close all active Redis connections
+ * Should be called during application shutdown
+ */
+export async function closeAllRedisConnections(): Promise<void> {
+  console.log(`Closing ${activeConnections.size} active Redis connections...`);
 
-  if (redisUrl) {
-    const subscriber = createRedisSubscriber();
-    await subscriber.quit();
-    console.log('Redis subscriber connection closed');
-  }
+  const closePromises = Array.from(activeConnections).map(async connection => {
+    try {
+      if (connection.status === 'ready' || connection.status === 'connecting') {
+        // Special handling for subscriber connections
+        try {
+          // Check if this connection has active subscriptions (subscriber pattern)
+          if (typeof (connection as any).unsubscribe === 'function') {
+            await (connection as any).unsubscribe();
+            console.log('Unsubscribed from Redis channels');
+          }
+        } catch (unsubError) {
+          console.warn('Error unsubscribing from Redis channels:', unsubError);
+        }
 
-  if (redisUrl) {
-    const publisher = createRedisPublisher();
-    await publisher.quit();
-    console.log('Redis publisher connection closed');
-  }
-});
+        await connection.quit();
+      } else if (connection.status !== 'end' && connection.status !== 'close') {
+        connection.disconnect();
+      }
+    } catch (error) {
+      Logger.error('Error closing Redis connection:', error);
+      // Force disconnect if quit fails
+      try {
+        connection.disconnect();
+      } catch (disconnectError) {
+        Logger.error('Error force disconnecting Redis connection:', disconnectError);
+      }
+    }
+  });
+
+  await Promise.all(closePromises);
+  activeConnections.clear();
+  console.log('All Redis connections closed');
+}

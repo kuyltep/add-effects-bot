@@ -24,7 +24,8 @@ export const dbConfig = {
 export const redisConfig = {
   url: process.env.REDIS_URL || 'redis://localhost:6379',
   maxRetriesPerRequest: 1,
-  reconnectOnError: true,
+  reconnectOnError: false,
+  lazyConnect: true,
 };
 
 // Telegram bot configuration

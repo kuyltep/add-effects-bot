@@ -16,10 +16,11 @@ export function getPrismaClient(): PrismaClient {
 
 export const prisma = getPrismaClient();
 
-// Handle shutdown
-process.on('beforeExit', async () => {
+// Function to manually disconnect Prisma (should be called from main process)
+export async function disconnectPrisma(): Promise<void> {
   if (prismaInstance) {
     await prismaInstance.$disconnect();
     console.log('Prisma Client disconnected');
+    prismaInstance = undefined;
   }
-});
+}
