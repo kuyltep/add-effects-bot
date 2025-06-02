@@ -11,7 +11,7 @@ import { createRedisPublisher } from '../utils/redis';
 import { applyImageEffect } from '../services/fal-ai';
 import { isMainThread, parentPort, workerData } from 'worker_threads';
 import { createImageOpenAI, editImageOpenAI } from '../services/openai';
-import { generateJointPhoto } from '../services/runway';
+// import { generateJointPhoto } from '../services/runway';
 
 // Constants
 const QUEUE_NAME = 'image-effect-generation';
@@ -34,39 +34,9 @@ const OPENAI_EFFECTS = [
 ];
 const FAL_AI_EFFECTS = ['plushify', 'ghiblify', 'cartoonify'];
 
-// Initialize Redis with Railway-specific settings
-const redisConfig = config.redis.url
-  ? (() => {
-      const redisURL = new URL(config.redis.url);
-      const redisConfig: any = {
-        host: redisURL.hostname,
-        port: parseInt(redisURL.port) || 6379,
-        maxRetriesPerRequest: null, // BullMQ требует null
-        lazyConnect: true,
-      };
-
-      // Добавляем username/password только если они есть (для локальной разработки могут отсутствовать)
-      if (redisURL.username) {
-        redisConfig.username = redisURL.username;
-      }
-      if (redisURL.password) {
-        redisConfig.password = redisURL.password;
-      }
-
-      // Railway требует dual stack lookup только для внутренних соединений
-      if (
-        redisURL.hostname.includes('railway.internal') ||
-        redisURL.hostname.includes('rlwy.net')
-      ) {
-        redisConfig.family = 0;
-      }
-
-      return redisConfig;
-    })()
-  : undefined;
-
-// Create Redis publisher for sending messages to bot
-const redisPublisher = createRedisPublisher();
+// Initialize resources
+let redisConnection = createRedisConnection();
+let redisPublisher = createRedisPublisher();
 
 // i18n translations for effect worker
 const translations = {
@@ -332,28 +302,14 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
           job.data.effectObject,
           prompt
         );
-
-        Logger.info(`✅ [ImageEffectWorker] Логотип/баннер применен через OpenAI`, {
-          finalOutputPath,
-        });
-      } else if (apiProvider === 'runway') {
-        Logger.info(`🎬 [ImageEffectWorker] Обработка через Runway`, {
-          effect,
-          localFilePaths,
-          prompt,
-          resolution,
-        });
-
-        finalOutputPath = await generateJointPhoto(
-          localFilePaths,
-          prompt,
-          resolution as Resolution
-        );
-
-        Logger.info(`✅ [ImageEffectWorker] Изображение обработано через Runway`, {
-          finalOutputPath,
-        });
-      }
+      } 
+      // else if (apiProvider === 'runway') {
+      //   finalOutputPath = await generateJointPhoto(
+      //     localFilePaths,
+      //     prompt,
+      //     resolution as Resolution
+      //   );
+      // }
     } else {
       const errorMsg = `Unsupported effect type: ${effect}`;
       Logger.error(`❌ [ImageEffectWorker] ${errorMsg}`, {
@@ -502,79 +458,29 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
   }
 }
 
-let worker;
-
 // Create the worker
 function createWorker() {
-  if (!redisConfig) {
-    throw new Error('Redis not configured - cannot create image effect worker');
+  try {
+    return new Worker<ImageEffectJobData>(QUEUE_NAME, processImageEffectJob, {
+      connection: redisConnection,
+      concurrency: parseInt(process.env.EFFECT_WORKER_CONCURRENCY || '3', 10),
+      stalledInterval: 10000, // Check for stalled jobs every 30 seconds
+      lockDuration: 300000, // Lock jobs for 5 minutes
+    });
+  } catch (error) {
+    Logger.error('Failed to create imageEffectWorker:', error);
+    
+    // Notify parent thread of initialization failure
+    if (!isMainThread && parentPort) {
+      parentPort.postMessage({ 
+        type: 'error', 
+        worker: workerData?.workerName || 'imageEffectWorker', 
+        error: error.message 
+      });
+    }
+    
+    throw error;
   }
-
-  return new Worker<ImageEffectJobData>(QUEUE_NAME, processImageEffectJob, {
-    connection: redisConfig,
-    concurrency: parseInt(process.env.EFFECT_WORKER_CONCURRENCY || '3', 10),
-    limiter: {
-      max: 10,
-      duration: 1000,
-    },
-  });
-}
-
-// Create and initialize worker
-if (redisConfig) {
-  worker = createWorker();
-
-  // Добавляем обработчики событий для диагностики
-  worker.on('active', (job: Job<ImageEffectJobData>) => {
-    Logger.info(`▶️ [ImageEffectWorker] Задание ${job.id} начато`, {
-      jobId: job.id,
-      generationId: job.data.generationId,
-      effect: job.data.effect,
-      userId: job.data.userId,
-    });
-  });
-
-  worker.on('completed', (job: Job<ImageEffectJobData>) => {
-    Logger.info(`✅ [ImageEffectWorker] Задание ${job.id} завершено успешно`, {
-      jobId: job.id,
-      generationId: job.data.generationId,
-    });
-  });
-
-  worker.on('failed', (job: Job<ImageEffectJobData>, err: Error) => {
-    Logger.error(
-      `❌ [ImageEffectWorker] Job ${job.id} failed for generation ${job.data.generationId}`,
-      {
-        error: err.message,
-        stack: err.stack,
-        attemptsMade: job.attemptsMade,
-        jobData: job.data,
-      }
-    );
-  });
-
-  worker.on('error', err => {
-    Logger.error('💥 [ImageEffectWorker] BullMQ Worker Error', {
-      error: err.message,
-      stack: err.stack,
-    });
-  });
-
-  worker.on('ready', () => {
-    Logger.info('🟢 [ImageEffectWorker] Worker готов к обработке заданий');
-  });
-
-  worker.on('paused', () => {
-    Logger.warn('⏸️ [ImageEffectWorker] Worker приостановлен');
-  });
-
-  worker.on('resumed', () => {
-    Logger.info('▶️ [ImageEffectWorker] Worker возобновлен');
-  });
-
-  console.log('✅ Image effect worker initialized');
-} else {
-  console.log('⚠️  Image effect worker not initialized - Redis not available');
 }
 
 // Graceful shutdown handler
@@ -600,6 +506,21 @@ const gracefulShutdown = async () => {
 // Register shutdown handlers
 process.on('SIGINT', gracefulShutdown);
 process.on('SIGTERM', gracefulShutdown);
+
+// Create and initialize worker
+const worker = createWorker();
+
+// Set up worker events
+worker.on('failed', (job: Job<ImageEffectJobData>, err: Error) => {
+  Logger.error(`Job ${job.id} failed for generation ${job.data.generationId}`, {
+    error: err,
+    attemptsMade: job.attemptsMade,
+  });
+});
+
+worker.on('error', err => {
+  Logger.error('BullMQ Worker Error', { error: err });
+});
 
 // If running in a worker thread, notify parent when ready
 if (!isMainThread && parentPort) {

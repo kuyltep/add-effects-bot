@@ -201,6 +201,9 @@ export async function canUserGenerate(
     return false;
   }
 
+  const currentDate = new Date()
+  const oneHourAgo = new Date(new Date().setHours(currentDate.getHours() - 1))
+
   // Check for ongoing generations
   const ongoingGenerations = await prisma.generation.count({
     where: {
@@ -208,6 +211,9 @@ export async function canUserGenerate(
       status: {
         in: [GenerationStatus.PENDING, GenerationStatus.PROCESSING],
       },
+      createdAt: {
+        gte: oneHourAgo
+      }
     },
   });
 

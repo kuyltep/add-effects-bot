@@ -1,4 +1,4 @@
-import { Redis, RedisOptions } from 'ioredis';
+import { Redis } from 'ioredis';
 import config from '../config';
 import { Logger } from './rollbar.logger';
 
@@ -10,9 +10,8 @@ if (!redisUrl) {
   );
 }
 
-// Debug Redis URL (mask password for security)
-console.log('Redis URL configured:', redisUrl ? redisUrl.replace(/:[^:@]*@/, ':***@') : 'NOT SET');
-console.log('NODE_ENV:', process.env.NODE_ENV);
+// Connection registry to track all active connections
+const activeConnections = new Set<Redis>();
 
 // Connection options
 const connectionOptions = {
@@ -34,12 +33,21 @@ const connectionOptions = {
   },
 };
 
-// Track all Redis connections for cleanup
-const activeConnections = new Set<Redis>();
-
-// Add connection throttling to prevent race conditions
-let connectionCreationCount = 0;
-const MAX_CONCURRENT_CONNECTIONS = 10;
+/**
+ * Registers a connection for tracking and cleanup
+ */
+function registerConnection(connection: Redis, context: string): Redis {
+  activeConnections.add(connection);
+  
+  connection.on('error', err => Logger.error(err, { context }));
+  
+  // Remove from registry when connection is closed
+  connection.on('end', () => {
+    activeConnections.delete(connection);
+  });
+  
+  return connection;
+}
 
 /**
  * Creates and returns a general Redis connection.
@@ -60,30 +68,7 @@ export function createRedisConnection(): Redis {
   );
 
   const connection = new Redis(redisUrl, connectionOptions);
-
-  connection.on('error', err => {
-    Logger.error(err, { context: 'Redis Connection' });
-    console.error('Redis connection error:', err.message);
-  });
-
-  connection.on('connect', () => {
-    console.log(`Redis connection established (${connectionCreationCount})`);
-  });
-
-  connection.on('ready', () => {
-    console.log(`Redis connection ready (${connectionCreationCount})`);
-  });
-
-  connection.on('close', () => {
-    connectionCreationCount = Math.max(0, connectionCreationCount - 1);
-    console.log(`Redis connection closed (remaining: ${connectionCreationCount})`);
-    activeConnections.delete(connection);
-  });
-
-  // Track the connection
-  activeConnections.add(connection);
-
-  return connection;
+  return registerConnection(connection, 'Redis Connection');
 }
 
 /**
@@ -95,29 +80,7 @@ export function createRedisSubscriber(): Redis {
 
   console.log('Creating Redis subscriber...');
   const subscriber = new Redis(redisUrl, connectionOptions);
-
-  subscriber.on('error', err => {
-    Logger.error(err, { context: 'Redis Subscriber' });
-    console.error('Redis subscriber error:', err.message);
-  });
-
-  subscriber.on('connect', () => {
-    console.log('Redis subscriber connected');
-  });
-
-  subscriber.on('ready', () => {
-    console.log('Redis subscriber ready');
-  });
-
-  subscriber.on('close', () => {
-    console.log('Redis subscriber closed');
-    activeConnections.delete(subscriber);
-  });
-
-  // Track the connection
-  activeConnections.add(subscriber);
-
-  return subscriber;
+  return registerConnection(subscriber, 'Redis Subscriber');
 }
 
 /**
@@ -129,29 +92,7 @@ export function createRedisPublisher(): Redis {
 
   console.log('Creating Redis publisher...');
   const publisher = new Redis(redisUrl, connectionOptions);
-
-  publisher.on('error', err => {
-    Logger.error(err, { context: 'Redis Publisher' });
-    console.error('Redis publisher error:', err.message);
-  });
-
-  publisher.on('connect', () => {
-    console.log('Redis publisher connected');
-  });
-
-  publisher.on('ready', () => {
-    console.log('Redis publisher ready');
-  });
-
-  publisher.on('close', () => {
-    console.log('Redis publisher closed');
-    activeConnections.delete(publisher);
-  });
-
-  // Track the connection
-  activeConnections.add(publisher);
-
-  return publisher;
+  return registerConnection(publisher, 'Redis Publisher');
 }
 
 /**
@@ -190,109 +131,45 @@ export async function publishBatch(
 }
 
 /**
- * Test Redis connection
- */
-export async function testRedisConnection(): Promise<boolean> {
-  if (!redisUrl) {
-    console.log('Redis URL not configured, skipping Redis test');
-    return false;
-  }
-
-  // Add small delay to avoid race conditions with other connections
-  await new Promise(resolve => setTimeout(resolve, 500));
-
-  console.log('Testing Redis connection...');
-  console.log('Redis URL:', redisUrl.replace(/:[^:@]*@/, ':***@'));
-
-  let testConnection: Redis | null = null;
-
-  try {
-    testConnection = new Redis(redisUrl, {
-      connectTimeout: 8000, // Increased timeout
-      lazyConnect: true,
-      // Railway требует family: 0 для dual stack lookup
-      family: 0,
-      retryStrategy: () => null, // Don't retry for test
-    });
-
-    await testConnection.connect();
-    await testConnection.ping();
-    console.log('✅ Redis connection test successful');
-    return true;
-  } catch (error) {
-    console.error('❌ Redis connection test failed:', error.message);
-    console.error('Error code:', error.code);
-
-    // Log additional details for debugging
-    if (error.code === 'ENOTFOUND') {
-      console.error('\n🔍 DNS RESOLUTION FAILED:');
-      console.error('Trying Railway-specific solutions...');
-      console.error('\n💡 RAILWAY REDIS SOLUTIONS:');
-      console.error('1. Using family: 0 for dual stack lookup (current attempt)');
-      console.error('2. If still failing, try REDIS_PUBLIC_URL instead of REDIS_URL');
-      console.error('3. Ensure Redis service is in the same Railway project');
-      console.error('4. Try adding ?family=0 to REDIS_URL manually');
-
-      // Extract hostname for additional info
-      const hostname = error.hostname || 'unknown';
-      console.error(`\n🌐 Failed hostname: ${hostname}`);
-
-      if (hostname.includes('railway.internal')) {
-        console.error('→ Railway internal network issue - trying family: 0');
-      } else if (hostname.includes('rlwy.net')) {
-        console.error('→ Railway proxy network - should work with family: 0');
-      }
-    }
-
-    return false;
-  } finally {
-    if (testConnection) {
-      try {
-        await testConnection.quit();
-      } catch (err) {
-        console.warn('Error closing test connection:', err.message);
-      }
-    }
-  }
-}
-
-/**
- * Close all active Redis connections
- * Should be called during application shutdown
+ * Closes all active Redis connections
  */
 export async function closeAllRedisConnections(): Promise<void> {
-  console.log(`Closing ${activeConnections.size} active Redis connections...`);
-
-  const closePromises = Array.from(activeConnections).map(async connection => {
+  Logger.info(`Closing ${activeConnections.size} active Redis connections...`);
+  
+  const closePromises = Array.from(activeConnections).map(async (connection) => {
     try {
       if (connection.status === 'ready' || connection.status === 'connecting') {
-        // Special handling for subscriber connections
-        try {
-          // Check if this connection has active subscriptions (subscriber pattern)
-          if (typeof (connection as any).unsubscribe === 'function') {
-            await (connection as any).unsubscribe();
-            console.log('Unsubscribed from Redis channels');
-          }
-        } catch (unsubError) {
-          console.warn('Error unsubscribing from Redis channels:', unsubError);
-        }
-
         await connection.quit();
-      } else if (connection.status !== 'end' && connection.status !== 'close') {
-        connection.disconnect();
+        Logger.info('Redis connection closed successfully');
       }
     } catch (error) {
       Logger.error('Error closing Redis connection:', error);
-      // Force disconnect if quit fails
-      try {
-        connection.disconnect();
-      } catch (disconnectError) {
-        Logger.error('Error force disconnecting Redis connection:', disconnectError);
-      }
     }
   });
 
   await Promise.all(closePromises);
   activeConnections.clear();
-  console.log('All Redis connections closed');
+  Logger.info('All Redis connections closed');
 }
+
+/**
+ * Get the number of active connections (for monitoring)
+ */
+export function getActiveConnectionCount(): number {
+  return activeConnections.size;
+}
+
+// Handle shutdown properly
+process.on('beforeExit', async () => {
+  await closeAllRedisConnections();
+});
+
+process.on('SIGINT', async () => {
+  await closeAllRedisConnections();
+  process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+  await closeAllRedisConnections();
+  process.exit(0);
+});

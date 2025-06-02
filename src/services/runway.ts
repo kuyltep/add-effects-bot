@@ -1,10 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import RunwayML from '@runwayml/sdk';
-import { resizeImage } from './sharp-service';
-import { saveImageBuffer } from './sharp-service';
-import { Resolution } from '../types/bot';
-import { Logger } from '../utils/rollbar.logger';
+import { Resolution } from '@prisma/client';
+
 
 const PHOTOS_AMOUNT = 2;
 
@@ -27,6 +25,9 @@ export async function generateJointPhoto(
   prompt: string,
   resolution: Resolution
 ): Promise<string> {
+
+  const {saveImageBuffer, resizeImage} = await import('./sharp-service')
+
   const base64Images = imagePaths.map(getBase64Image);
   if (imagePaths.length !== PHOTOS_AMOUNT) {
     throw new Error(`Exactly ${PHOTOS_AMOUNT} images are required for joint photo generation`);
@@ -89,7 +90,6 @@ export async function generateJointPhoto(
 
     return outputPath;
   } catch (error) {
-    Logger.error(`Error applying image effect: ${error.message}`);
     throw error;
   }
 }
