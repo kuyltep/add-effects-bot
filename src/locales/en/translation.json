@@ -52,6 +52,7 @@
       "processing": "🔄 Processing your request...\n\nGenerating images with the following settings:\nPrompt: {{prompt}}",
       "completed": "✅ Generation completed!\n\nPrompt: {{prompt}}",
       "translationNote": "Note: Your prompt was translated to English for better results.",
+      "too_many_ongoing": "❌ You have too many ongoing generations. Please wait until they are completed.",
       "noGenerations": "❌ You have no generations left.\n\nYou can:\n1. Share your referral link to get 5 free generations when someone signs up\n2. Buy more generation packages",
       "remainingGenerations": "Great result! 😎\nYou have {{count}} image generations left\nWant to try again?",
       "uncompressed_files": "📎 Full-size files attached below.",

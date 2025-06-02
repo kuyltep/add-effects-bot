@@ -10,16 +10,24 @@ if (!redisUrl) {
   );
 }
 
+// Debug Redis URL (mask password for security)
+console.log('Redis URL configured:', redisUrl ? redisUrl.replace(/:[^:@]*@/, ':***@') : 'NOT SET');
+console.log('NODE_ENV:', process.env.NODE_ENV);
+
 // Connection options
 const connectionOptions = {
   maxRetriesPerRequest: 1,
   enableReadyCheck: true,
   connectTimeout: 10000,
   lazyConnect: true,
+  // Let the system decide between IPv4/IPv6 based on DNS resolution
+  // Don't force family, support both IPv4 and IPv6
   // Disable automatic reconnection on shutdown
   retryStrategy: (times: number) => {
+    console.log(`Redis retry attempt ${times}`);
     // Only retry a few times, then give up
     if (times > 3) {
+      console.log('Redis retries exhausted, giving up');
       return null; // Stop retrying
     }
     return Math.min(times * 1000, 3000);
@@ -36,16 +44,29 @@ const activeConnections = new Set<Redis>();
 export function createRedisConnection(): Redis {
   if (!redisUrl) throw new Error('Redis URL не найден');
 
+  console.log('Creating Redis connection...');
   const connection = new Redis(redisUrl, connectionOptions);
-  connection.on('error', err => Logger.error(err, { context: 'Redis Connection' }));
+
+  connection.on('error', err => {
+    Logger.error(err, { context: 'Redis Connection' });
+    console.error('Redis connection error:', err.message);
+  });
+
+  connection.on('connect', () => {
+    console.log('Redis connection established');
+  });
+
+  connection.on('ready', () => {
+    console.log('Redis connection ready');
+  });
+
+  connection.on('close', () => {
+    console.log('Redis connection closed');
+    activeConnections.delete(connection);
+  });
 
   // Track the connection
   activeConnections.add(connection);
-
-  // Remove from tracking when closed
-  connection.on('close', () => {
-    activeConnections.delete(connection);
-  });
 
   return connection;
 }
@@ -57,16 +78,29 @@ export function createRedisConnection(): Redis {
 export function createRedisSubscriber(): Redis {
   if (!redisUrl) throw new Error('Redis URL не найден');
 
+  console.log('Creating Redis subscriber...');
   const subscriber = new Redis(redisUrl, connectionOptions);
-  subscriber.on('error', err => Logger.error(err, { context: 'Redis Subscriber' }));
+
+  subscriber.on('error', err => {
+    Logger.error(err, { context: 'Redis Subscriber' });
+    console.error('Redis subscriber error:', err.message);
+  });
+
+  subscriber.on('connect', () => {
+    console.log('Redis subscriber connected');
+  });
+
+  subscriber.on('ready', () => {
+    console.log('Redis subscriber ready');
+  });
+
+  subscriber.on('close', () => {
+    console.log('Redis subscriber closed');
+    activeConnections.delete(subscriber);
+  });
 
   // Track the connection
   activeConnections.add(subscriber);
-
-  // Remove from tracking when closed
-  subscriber.on('close', () => {
-    activeConnections.delete(subscriber);
-  });
 
   return subscriber;
 }
@@ -78,16 +112,29 @@ export function createRedisSubscriber(): Redis {
 export function createRedisPublisher(): Redis {
   if (!redisUrl) throw new Error('Redis URL не найден');
 
+  console.log('Creating Redis publisher...');
   const publisher = new Redis(redisUrl, connectionOptions);
-  publisher.on('error', err => Logger.error(err, { context: 'Redis Publisher' }));
+
+  publisher.on('error', err => {
+    Logger.error(err, { context: 'Redis Publisher' });
+    console.error('Redis publisher error:', err.message);
+  });
+
+  publisher.on('connect', () => {
+    console.log('Redis publisher connected');
+  });
+
+  publisher.on('ready', () => {
+    console.log('Redis publisher ready');
+  });
+
+  publisher.on('close', () => {
+    console.log('Redis publisher closed');
+    activeConnections.delete(publisher);
+  });
 
   // Track the connection
   activeConnections.add(publisher);
-
-  // Remove from tracking when closed
-  publisher.on('close', () => {
-    activeConnections.delete(publisher);
-  });
 
   return publisher;
 }
@@ -124,6 +171,53 @@ export async function publishBatch(
     await publisher
       .quit()
       .catch(err => Logger.error(err, { context: 'Redis Publisher Batch Quit' }));
+  }
+}
+
+/**
+ * Test Redis connection
+ */
+export async function testRedisConnection(): Promise<boolean> {
+  if (!redisUrl) {
+    console.log('Redis URL not configured, skipping Redis test');
+    return false;
+  }
+
+  console.log('Testing Redis connection...');
+  let testConnection: Redis | null = null;
+
+  try {
+    testConnection = new Redis(redisUrl, {
+      connectTimeout: 5000,
+      lazyConnect: true,
+      // Support both IPv4 and IPv6 - let system decide based on DNS
+      retryStrategy: () => null, // Don't retry for test
+    });
+
+    await testConnection.connect();
+    await testConnection.ping();
+    console.log('Redis connection test successful');
+    return true;
+  } catch (error) {
+    console.error('Redis connection test failed:', error.message);
+
+    // Log additional details for debugging
+    if (error.code === 'ENOTFOUND') {
+      console.error('DNS resolution failed. Check:');
+      console.error('1. Redis service is running');
+      console.error('2. REDIS_URL environment variable is correct');
+      console.error('3. Network connectivity to Redis host');
+    }
+
+    return false;
+  } finally {
+    if (testConnection) {
+      try {
+        await testConnection.quit();
+      } catch (err) {
+        console.warn('Error closing test connection:', err.message);
+      }
+    }
   }
 }
 
