@@ -2,16 +2,62 @@ import { Worker, Job } from 'bullmq';
 import { UpgradeGenerationJob } from './upgradeQueue';
 import { GenerationStatus } from '@prisma/client';
 import { prisma } from '../utils/prisma';
-import { createRedisConnection, createRedisPublisher } from '../utils/redis';
+import { createRedisPublisher } from '../utils/redis';
 import fs from 'fs';
 import path from 'path';
 import { enhanceImage } from '../services/replicate';
 import i18next from '../i18n';
 import fetch from 'node-fetch';
 import { isMainThread, parentPort, workerData } from 'worker_threads';
+import config from '../config';
 
-// Initialize resources
-const redisConnection = createRedisConnection();
+// Initialize Redis connection with Railway-specific settings
+const redisConfig = config.redis.url
+  ? (() => {
+      const redisURL = new URL(config.redis.url);
+      const redisConfig: any = {
+        host: redisURL.hostname,
+        port: parseInt(redisURL.port) || 6379,
+        maxRetriesPerRequest: null, // BullMQ требует null
+        lazyConnect: true,
+      };
+
+      // Добавляем username/password только если они есть (для локальной разработки могут отсутствовать)
+      if (redisURL.username) {
+        redisConfig.username = redisURL.username;
+      }
+      if (redisURL.password) {
+        redisConfig.password = redisURL.password;
+      }
+
+      // Railway требует dual stack lookup только для внутренних соединений
+      if (
+        redisURL.hostname.includes('railway.internal') ||
+        redisURL.hostname.includes('rlwy.net')
+      ) {
+        redisConfig.family = 0;
+      }
+
+      return redisConfig;
+    })()
+  : undefined;
+
+// Debug Redis configuration
+if (redisConfig) {
+  console.log('🔧 Redis config for upgradeWorker:', {
+    host: redisConfig.host,
+    port: redisConfig.port,
+    hasUsername: !!redisConfig.username,
+    hasPassword: !!redisConfig.password,
+    family: redisConfig.family,
+    maxRetriesPerRequest: redisConfig.maxRetriesPerRequest,
+    lazyConnect: redisConfig.lazyConnect,
+  });
+} else {
+  console.log('⚠️  No Redis config for upgradeWorker');
+}
+
+// Create Redis publisher for sending messages to bot
 const redisPublisher = createRedisPublisher();
 
 // Define result type
@@ -25,8 +71,12 @@ const IMAGE_UPGRADE_COST = +process.env.IMAGE_UPGRADE_COST;
 
 // Create and configure the worker
 function createWorker() {
+  if (!redisConfig) {
+    throw new Error('Redis not configured - cannot create upgrade worker');
+  }
+
   return new Worker<UpgradeGenerationJob, UpgradeResult>('upgrade-generation', processUpgradeJob, {
-    connection: redisConnection,
+    connection: redisConfig,
     concurrency: parseInt(process.env.UPGRADE_WORKER_CONCURRENCY || '1', 10),
     stalledInterval: 10000, // Check for stalled jobs every 30 seconds
     lockDuration: 300000, // Lock jobs for 5 minutes
@@ -255,9 +305,12 @@ function setupWorkerEvents(worker: Worker) {
 // Graceful shutdown handler
 const gracefulShutdown = async () => {
   console.info('Shutting down upgrade worker...');
-  await worker.close();
-  await redisPublisher.quit();
-  await redisConnection.quit();
+  if (worker) {
+    await worker.close();
+  }
+  if (redisPublisher) {
+    await redisPublisher.quit();
+  }
   console.info('Upgrade worker shut down successfully');
 
   // If running in a worker thread, notify the parent that we're shutting down
@@ -271,24 +324,37 @@ process.on('SIGINT', gracefulShutdown);
 process.on('SIGTERM', gracefulShutdown);
 
 // Create and initialize worker
-const worker = createWorker();
+let worker: Worker<UpgradeGenerationJob, UpgradeResult> | null = null;
 
-// Set up worker events
-setupWorkerEvents(worker);
+if (redisConfig) {
+  worker = createWorker();
 
-// If running in a worker thread, notify the parent that we're ready
-if (!isMainThread && parentPort) {
-  parentPort.postMessage({ type: 'ready', worker: workerData?.workerName || 'upgradeWorker' });
+  // Set up worker events
+  setupWorkerEvents(worker);
 
-  // Listen for messages from the parent thread
-  parentPort.on('message', message => {
-    if (message.type === 'shutdown') {
-      gracefulShutdown().catch(error => {
-        console.error('Error during worker shutdown:', error);
-        process.exit(1);
-      });
-    }
-  });
+  console.log('✅ Upgrade worker initialized');
+
+  // If running in a worker thread, notify the parent that we're ready
+  if (!isMainThread && parentPort) {
+    parentPort.postMessage({ type: 'ready', worker: workerData?.workerName || 'upgradeWorker' });
+
+    // Listen for messages from the parent thread
+    parentPort.on('message', message => {
+      if (message.type === 'shutdown') {
+        gracefulShutdown().catch(error => {
+          console.error('Error during worker shutdown:', error);
+          process.exit(1);
+        });
+      }
+    });
+  }
+} else {
+  console.log('⚠️  Upgrade worker not initialized - Redis not available');
+
+  // If running in a worker thread, notify parent of failure
+  if (!isMainThread && parentPort) {
+    parentPort.postMessage({ type: 'error', error: 'Redis not available' });
+  }
 }
 
 // Export the worker

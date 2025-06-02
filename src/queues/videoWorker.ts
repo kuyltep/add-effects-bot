@@ -14,15 +14,30 @@ import config from '../config';
 const redisConfig = config.redis.url
   ? (() => {
       const redisURL = new URL(config.redis.url);
-      return {
-        family: 0, // Railway требует dual stack lookup
+      const redisConfig: any = {
         host: redisURL.hostname,
         port: parseInt(redisURL.port) || 6379,
-        username: redisURL.username,
-        password: redisURL.password,
-        maxRetriesPerRequest: 1,
+        maxRetriesPerRequest: null, // BullMQ требует null
         lazyConnect: true,
       };
+
+      // Добавляем username/password только если они есть (для локальной разработки могут отсутствовать)
+      if (redisURL.username) {
+        redisConfig.username = redisURL.username;
+      }
+      if (redisURL.password) {
+        redisConfig.password = redisURL.password;
+      }
+
+      // Railway требует dual stack lookup только для внутренних соединений
+      if (
+        redisURL.hostname.includes('railway.internal') ||
+        redisURL.hostname.includes('rlwy.net')
+      ) {
+        redisConfig.family = 0;
+      }
+
+      return redisConfig;
     })()
   : undefined;
 
@@ -319,24 +334,37 @@ process.on('SIGINT', gracefulShutdown);
 process.on('SIGTERM', gracefulShutdown);
 
 // Create and initialize worker
-const worker = createWorker();
+let worker: Worker<VideoGenerationJob, VideoResult> | null = null;
 
-// Set up worker events
-setupWorkerEvents(worker);
+if (redisConfig) {
+  worker = createWorker();
 
-// If running in a worker thread, notify the parent that we're ready
-if (!isMainThread && parentPort) {
-  parentPort.postMessage({ type: 'ready', worker: workerData?.workerName || 'videoWorker' });
+  // Set up worker events
+  setupWorkerEvents(worker);
 
-  // Listen for messages from the parent thread
-  parentPort.on('message', message => {
-    if (message.type === 'shutdown') {
-      gracefulShutdown().catch(error => {
-        console.error('Error during worker shutdown:', error);
-        process.exit(1);
-      });
-    }
-  });
+  console.log('✅ Video worker initialized');
+
+  // If running in a worker thread, notify the parent that we're ready
+  if (!isMainThread && parentPort) {
+    parentPort.postMessage({ type: 'ready', worker: workerData?.workerName || 'videoWorker' });
+
+    // Listen for messages from the parent thread
+    parentPort.on('message', message => {
+      if (message.type === 'shutdown') {
+        gracefulShutdown().catch(error => {
+          console.error('Error during worker shutdown:', error);
+          process.exit(1);
+        });
+      }
+    });
+  }
+} else {
+  console.log('⚠️  Video worker not initialized - Redis not available');
+
+  // If running in a worker thread, notify parent of failure
+  if (!isMainThread && parentPort) {
+    parentPort.postMessage({ type: 'error', error: 'Redis not available' });
+  }
 }
 
 // Export the worker

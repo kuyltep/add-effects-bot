@@ -31,17 +31,47 @@ export type API_PROVIDER = 'openai' | 'fal-ai' | 'runway' | 'gap';
 const redisConfig = config.redis.url
   ? (() => {
       const redisURL = new URL(config.redis.url);
-      return {
-        family: 0, // Railway требует dual stack lookup
+      const redisConfig: any = {
         host: redisURL.hostname,
         port: parseInt(redisURL.port) || 6379,
-        username: redisURL.username,
-        password: redisURL.password,
-        maxRetriesPerRequest: 1,
+        maxRetriesPerRequest: null, // BullMQ требует null
         lazyConnect: true,
       };
+
+      // Добавляем username/password только если они есть (для локальной разработки могут отсутствовать)
+      if (redisURL.username) {
+        redisConfig.username = redisURL.username;
+      }
+      if (redisURL.password) {
+        redisConfig.password = redisURL.password;
+      }
+
+      // Railway требует dual stack lookup только для внутренних соединений
+      if (
+        redisURL.hostname.includes('railway.internal') ||
+        redisURL.hostname.includes('rlwy.net')
+      ) {
+        redisConfig.family = 0;
+      }
+
+      return redisConfig;
     })()
   : undefined;
+
+// Debug Redis configuration
+if (redisConfig) {
+  console.log('🔧 Redis config for imageEffectQueue:', {
+    host: redisConfig.host,
+    port: redisConfig.port,
+    hasUsername: !!redisConfig.username,
+    hasPassword: !!redisConfig.password,
+    family: redisConfig.family,
+    maxRetriesPerRequest: redisConfig.maxRetriesPerRequest,
+    lazyConnect: redisConfig.lazyConnect,
+  });
+} else {
+  console.log('⚠️  No Redis config for imageEffectQueue');
+}
 
 // Create the BullMQ queue instance
 export const imageEffectQueue = redisConfig
@@ -59,6 +89,13 @@ export const imageEffectQueue = redisConfig
     })
   : null;
 
+// Log queue creation status
+if (imageEffectQueue) {
+  console.log('✅ Image effect queue created successfully');
+} else {
+  console.log('⚠️  Image effect queue not created - Redis not available');
+}
+
 /**
  * Adds a job to the image effect generation queue.
  *
@@ -66,6 +103,10 @@ export const imageEffectQueue = redisConfig
  * @returns The added job instance.
  */
 export async function addImageEffectJob(data: ImageEffectJobData) {
+  if (!imageEffectQueue) {
+    throw new Error('Image effect queue not available - Redis connection failed');
+  }
+
   try {
     const job = await imageEffectQueue.add(`generate-${data.effect}-${data.generationId}`, data);
     return job;
@@ -84,11 +125,15 @@ export function createImageEffectWorker(): Worker<ImageEffectJobData> {
 
 // Graceful shutdown handling
 process.on('SIGINT', async () => {
-  await imageEffectQueue.close();
+  if (imageEffectQueue) {
+    await imageEffectQueue.close();
+  }
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
-  await imageEffectQueue.close();
+  if (imageEffectQueue) {
+    await imageEffectQueue.close();
+  }
   process.exit(0);
 });

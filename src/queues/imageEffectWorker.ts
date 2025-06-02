@@ -38,15 +38,30 @@ const FAL_AI_EFFECTS = ['plushify', 'ghiblify', 'cartoonify'];
 const redisConfig = config.redis.url
   ? (() => {
       const redisURL = new URL(config.redis.url);
-      return {
-        family: 0, // Railway требует dual stack lookup
+      const redisConfig: any = {
         host: redisURL.hostname,
         port: parseInt(redisURL.port) || 6379,
-        username: redisURL.username,
-        password: redisURL.password,
-        maxRetriesPerRequest: 1,
+        maxRetriesPerRequest: null, // BullMQ требует null
         lazyConnect: true,
       };
+
+      // Добавляем username/password только если они есть (для локальной разработки могут отсутствовать)
+      if (redisURL.username) {
+        redisConfig.username = redisURL.username;
+      }
+      if (redisURL.password) {
+        redisConfig.password = redisURL.password;
+      }
+
+      // Railway требует dual stack lookup только для внутренних соединений
+      if (
+        redisURL.hostname.includes('railway.internal') ||
+        redisURL.hostname.includes('rlwy.net')
+      ) {
+        redisConfig.family = 0;
+      }
+
+      return redisConfig;
     })()
   : undefined;
 
@@ -367,18 +382,24 @@ function createWorker() {
 }
 
 // Create and initialize worker
-worker = createWorker();
+if (redisConfig) {
+  worker = createWorker();
 
-worker.on('failed', (job: Job<ImageEffectJobData>, err: Error) => {
-  Logger.error(`Job ${job.id} failed for generation ${job.data.generationId}`, {
-    error: err,
-    attemptsMade: job.attemptsMade,
+  worker.on('failed', (job: Job<ImageEffectJobData>, err: Error) => {
+    Logger.error(`Job ${job.id} failed for generation ${job.data.generationId}`, {
+      error: err,
+      attemptsMade: job.attemptsMade,
+    });
   });
-});
 
-worker.on('error', err => {
-  Logger.error('BullMQ Worker Error', { error: err });
-});
+  worker.on('error', err => {
+    Logger.error('BullMQ Worker Error', { error: err });
+  });
+
+  console.log('✅ Image effect worker initialized');
+} else {
+  console.log('⚠️  Image effect worker not initialized - Redis not available');
+}
 
 // Graceful shutdown handler
 const gracefulShutdown = async () => {

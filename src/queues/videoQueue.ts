@@ -21,15 +21,30 @@ export interface VideoGenerationJob {
 const redisConfig = config.redis.url
   ? (() => {
       const redisURL = new URL(config.redis.url);
-      return {
-        family: 0, // Railway требует dual stack lookup
+      const redisConfig: any = {
         host: redisURL.hostname,
         port: parseInt(redisURL.port) || 6379,
-        username: redisURL.username,
-        password: redisURL.password,
-        maxRetriesPerRequest: 1,
+        maxRetriesPerRequest: null, // BullMQ требует null
         lazyConnect: true,
       };
+
+      // Добавляем username/password только если они есть (для локальной разработки могут отсутствовать)
+      if (redisURL.username) {
+        redisConfig.username = redisURL.username;
+      }
+      if (redisURL.password) {
+        redisConfig.password = redisURL.password;
+      }
+
+      // Railway требует dual stack lookup только для внутренних соединений
+      if (
+        redisURL.hostname.includes('railway.internal') ||
+        redisURL.hostname.includes('rlwy.net')
+      ) {
+        redisConfig.family = 0;
+      }
+
+      return redisConfig;
     })()
   : undefined;
 
