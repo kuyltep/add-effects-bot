@@ -5,9 +5,13 @@ import { Logger } from './rollbar.logger';
 // Redis connection details
 const redisUrl = config.redis.url;
 if (!redisUrl) {
-  Logger.error(
-    'Критическая ошибка: Переменная окружения REDIS_URL или значение по умолчанию в config.redis.url не установлено!'
-  );
+  if (process.env.REDIS_DISABLED === 'true') {
+    console.log('⚠️  Redis explicitly disabled via REDIS_DISABLED=true');
+  } else {
+    Logger.error(
+      'Критическая ошибка: Переменная окружения REDIS_URL или значение по умолчанию в config.redis.url не установлено!'
+    );
+  }
 }
 
 // Debug Redis URL (mask password for security)
@@ -20,7 +24,7 @@ const connectionOptions = {
   enableReadyCheck: true,
   connectTimeout: 10000,
   lazyConnect: true,
-  family: 6,
+  // DNS resolution issues on Railway - let system try both IPv4/IPv6
   retryStrategy: (times: number) => {
     console.log(`Redis retry attempt ${times}`);
     // Only retry a few times, then give up
@@ -200,6 +204,8 @@ export async function testRedisConnection(): Promise<boolean> {
   await new Promise(resolve => setTimeout(resolve, 500));
 
   console.log('Testing Redis connection...');
+  console.log('Redis URL:', redisUrl.replace(/:[^:@]*@/, ':***@'));
+
   let testConnection: Redis | null = null;
 
   try {
@@ -216,14 +222,28 @@ export async function testRedisConnection(): Promise<boolean> {
     return true;
   } catch (error) {
     console.error('❌ Redis connection test failed:', error.message);
+    console.error('Error code:', error.code);
 
     // Log additional details for debugging
     if (error.code === 'ENOTFOUND') {
-      console.error('DNS resolution failed. Check:');
-      console.error('1. Redis service is running');
-      console.error('2. REDIS_URL environment variable is correct');
-      console.error('3. Network connectivity to Redis host');
-      console.error('4. Try using external Redis URL instead of internal');
+      console.error('\n🔍 DNS RESOLUTION FAILED:');
+      console.error('This is a Railway infrastructure issue.');
+      console.error('\n💡 POSSIBLE SOLUTIONS:');
+      console.error('1. Wait 5-10 minutes and redeploy (Railway DNS issues are usually temporary)');
+      console.error('2. Restart Redis service in Railway dashboard');
+      console.error('3. Delete and recreate Redis service');
+      console.error('4. Use external Redis provider (Redis Cloud, Upstash, etc.)');
+      console.error('5. Contact Railway support');
+
+      // Extract hostname for additional info
+      const hostname = error.hostname || 'unknown';
+      console.error(`\n🌐 Failed hostname: ${hostname}`);
+
+      if (hostname.includes('railway.internal')) {
+        console.error('→ This is Railway internal network issue');
+      } else if (hostname.includes('rlwy.net')) {
+        console.error('→ This is Railway proxy network issue');
+      }
     }
 
     return false;
@@ -277,4 +297,38 @@ export async function closeAllRedisConnections(): Promise<void> {
   await Promise.all(closePromises);
   activeConnections.clear();
   console.log('All Redis connections closed');
+}
+
+/**
+ * Perform DNS diagnostic checks
+ */
+export async function diagnoseDNS(): Promise<void> {
+  console.log('\n🔍 DNS DIAGNOSTICS:');
+
+  const dns = require('dns').promises;
+
+  const hostsToTest = ['redis.railway.internal', 'google.com', '8.8.8.8'];
+
+  for (const host of hostsToTest) {
+    try {
+      console.log(`Testing ${host}...`);
+      const addresses = await dns.lookup(host);
+      console.log(`✅ ${host} resolves to: ${addresses.address}`);
+    } catch (error) {
+      console.error(`❌ ${host} failed: ${error.message}`);
+    }
+  }
+
+  // Test current Redis URL host
+  if (redisUrl) {
+    try {
+      const url = new URL(redisUrl.replace('redis://', 'http://'));
+      const host = url.hostname;
+      console.log(`Testing Redis host ${host}...`);
+      const addresses = await dns.lookup(host);
+      console.log(`✅ Redis host resolves to: ${addresses.address}`);
+    } catch (error) {
+      console.error(`❌ Redis host failed: ${error.message}`);
+    }
+  }
 }
