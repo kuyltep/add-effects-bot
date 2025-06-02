@@ -11,7 +11,7 @@ import { createRedisConnection, createRedisPublisher } from '../utils/redis';
 import { applyImageEffect } from '../services/fal-ai';
 import { isMainThread, parentPort, workerData } from 'worker_threads';
 import { createImageOpenAI, editImageOpenAI } from '../services/openai';
-import { generateJointPhoto } from '../services/runway';
+// import { generateJointPhoto } from '../services/runway';
 
 // Constants
 const QUEUE_NAME = 'image-effect-generation';
@@ -35,17 +35,8 @@ const OPENAI_EFFECTS = [
 const FAL_AI_EFFECTS = ['plushify', 'ghiblify', 'cartoonify'];
 
 // Initialize resources
-let redisConnection;
-let redisPublisher;
-
-function initializeRedisConnections() {
-  if (!redisConnection) {
-    redisConnection = createRedisConnection();
-  }
-  if (!redisPublisher) {
-    redisPublisher = createRedisPublisher();
-  }
-}
+let redisConnection = createRedisConnection();
+let redisPublisher = createRedisPublisher();
 
 // i18n translations for effect worker
 const translations = {
@@ -90,9 +81,6 @@ async function downloadTelegramFile(fileId: string): Promise<string> {
   const tempDir = path.join(UPLOAD_DIR, 'temp');
   await fs.mkdir(tempDir, { recursive: true });
   const filePath = path.join(tempDir, `${uuidv4()}-${fileId}.jpg`);
-
-  // Ensure Redis connections are initialized
-  initializeRedisConnections();
 
   // Request the bot to download the file via Redis
   await redisPublisher.publish(
@@ -161,9 +149,6 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
   let finalOutputPath: string | null = null;
 
   try {
-    // Ensure Redis connections are initialized
-    initializeRedisConnections();
-
     // 1. Update status to PROCESSING
     await prisma.generation.update({
       where: { id: generationId },
@@ -248,13 +233,14 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
           job.data.effectObject,
           prompt
         );
-      } else if (apiProvider === 'runway') {
-        finalOutputPath = await generateJointPhoto(
-          localFilePaths,
-          prompt,
-          resolution as Resolution
-        );
-      }
+      } 
+      // else if (apiProvider === 'runway') {
+      //   finalOutputPath = await generateJointPhoto(
+      //     localFilePaths,
+      //     prompt,
+      //     resolution as Resolution
+      //   );
+      // }
     } else {
       throw new Error(`Unsupported effect type: ${effect}`);
     }
@@ -315,9 +301,6 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
         Logger.error('Failed to update generation status to FAILED', { updateErr })
       );
 
-    // Ensure Redis connections are initialized
-    initializeRedisConnections();
-
     // Notify user of failure via Redis
     await redisPublisher
       .publish(
@@ -351,36 +334,30 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
   }
 }
 
-let worker;
-
 // Create the worker
 function createWorker() {
-  // Initialize Redis connections
-  initializeRedisConnections();
-
-  return new Worker<ImageEffectJobData>(QUEUE_NAME, processImageEffectJob, {
-    connection: redisConnection,
-    concurrency: parseInt(process.env.EFFECT_WORKER_CONCURRENCY || '3', 10),
-    limiter: {
-      max: 10,
-      duration: 1000,
-    },
-  });
+  try {
+    return new Worker<ImageEffectJobData>(QUEUE_NAME, processImageEffectJob, {
+      connection: redisConnection,
+      concurrency: parseInt(process.env.EFFECT_WORKER_CONCURRENCY || '3', 10),
+      stalledInterval: 10000, // Check for stalled jobs every 30 seconds
+      lockDuration: 300000, // Lock jobs for 5 minutes
+    });
+  } catch (error) {
+    Logger.error('Failed to create imageEffectWorker:', error);
+    
+    // Notify parent thread of initialization failure
+    if (!isMainThread && parentPort) {
+      parentPort.postMessage({ 
+        type: 'error', 
+        worker: workerData?.workerName || 'imageEffectWorker', 
+        error: error.message 
+      });
+    }
+    
+    throw error;
+  }
 }
-
-// Create and initialize worker
-worker = createWorker();
-
-worker.on('failed', (job: Job<ImageEffectJobData>, err: Error) => {
-  Logger.error(`Job ${job.id} failed for generation ${job.data.generationId}`, {
-    error: err,
-    attemptsMade: job.attemptsMade,
-  });
-});
-
-worker.on('error', err => {
-  Logger.error('BullMQ Worker Error', { error: err });
-});
 
 // Graceful shutdown handler
 const gracefulShutdown = async () => {
@@ -412,6 +389,21 @@ const gracefulShutdown = async () => {
 // Register shutdown handlers
 process.on('SIGINT', gracefulShutdown);
 process.on('SIGTERM', gracefulShutdown);
+
+// Create and initialize worker
+const worker = createWorker();
+
+// Set up worker events
+worker.on('failed', (job: Job<ImageEffectJobData>, err: Error) => {
+  Logger.error(`Job ${job.id} failed for generation ${job.data.generationId}`, {
+    error: err,
+    attemptsMade: job.attemptsMade,
+  });
+});
+
+worker.on('error', err => {
+  Logger.error('BullMQ Worker Error', { error: err });
+});
 
 // If running in a worker thread, notify parent when ready
 if (!isMainThread && parentPort) {

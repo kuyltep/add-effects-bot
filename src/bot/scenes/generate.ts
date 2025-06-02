@@ -76,9 +76,9 @@ async function showInitialOptions(ctx: MyContext): Promise<void> {
       [Markup.button.callback(stylizePhotoText, 'select_photo_styling')],
       [Markup.button.callback(videoEffectsText, 'select_video_effects')],
       [Markup.button.callback(stylizeLogoText, 'select_logo_styling')],
-      [Markup.button.callback(stylizeBannerText, 'select_banner_styling')],
-      [Markup.button.callback(stylizeRoomDesign, 'select_room_design')],
-      [Markup.button.callback(jointPhoto, 'select_joint_photo')],
+      // [Markup.button.callback(stylizeBannerText, 'select_banner_styling')],
+      // [Markup.button.callback(stylizeRoomDesign, 'select_room_design')],
+      // [Markup.button.callback(jointPhoto, 'select_joint_photo')],
     ]).reply_markup,
   });
 }

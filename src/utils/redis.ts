@@ -1,4 +1,4 @@
-import { Redis, RedisOptions } from 'ioredis';
+import { Redis } from 'ioredis';
 import config from '../config';
 import { Logger } from './rollbar.logger';
 
@@ -9,6 +9,9 @@ if (!redisUrl) {
     'Критическая ошибка: Переменная окружения REDIS_URL или значение по умолчанию в config.redis.url не установлено!'
   );
 }
+
+// Connection registry to track all active connections
+const activeConnections = new Set<Redis>();
 
 // Connection options
 const connectionOptions = {
@@ -22,6 +25,22 @@ const connectionOptions = {
 };
 
 /**
+ * Registers a connection for tracking and cleanup
+ */
+function registerConnection(connection: Redis, context: string): Redis {
+  activeConnections.add(connection);
+  
+  connection.on('error', err => Logger.error(err, { context }));
+  
+  // Remove from registry when connection is closed
+  connection.on('end', () => {
+    activeConnections.delete(connection);
+  });
+  
+  return connection;
+}
+
+/**
  * Creates and returns a general Redis connection.
  * Caller is responsible for handling errors and closing the connection.
  */
@@ -29,9 +48,7 @@ export function createRedisConnection(): Redis {
   if (!redisUrl) throw new Error('Redis URL не найден');
 
   const connection = new Redis(redisUrl, connectionOptions);
-  connection.on('error', err => Logger.error(err, { context: 'Redis Connection' }));
-
-  return connection;
+  return registerConnection(connection, 'Redis Connection');
 }
 
 /**
@@ -42,9 +59,7 @@ export function createRedisSubscriber(): Redis {
   if (!redisUrl) throw new Error('Redis URL не найден');
 
   const subscriber = new Redis(redisUrl, connectionOptions);
-  subscriber.on('error', err => Logger.error(err, { context: 'Redis Subscriber' }));
-
-  return subscriber;
+  return registerConnection(subscriber, 'Redis Subscriber');
 }
 
 /**
@@ -55,9 +70,7 @@ export function createRedisPublisher(): Redis {
   if (!redisUrl) throw new Error('Redis URL не найден');
 
   const publisher = new Redis(redisUrl, connectionOptions);
-  publisher.on('error', err => Logger.error(err, { context: 'Redis Publisher' }));
-
-  return publisher;
+  return registerConnection(publisher, 'Redis Publisher');
 }
 
 /**
@@ -95,23 +108,46 @@ export async function publishBatch(
   }
 }
 
-// Handle shutdown
+/**
+ * Closes all active Redis connections
+ */
+export async function closeAllRedisConnections(): Promise<void> {
+  Logger.info(`Closing ${activeConnections.size} active Redis connections...`);
+  
+  const closePromises = Array.from(activeConnections).map(async (connection) => {
+    try {
+      if (connection.status === 'ready' || connection.status === 'connecting') {
+        await connection.quit();
+        Logger.info('Redis connection closed successfully');
+      }
+    } catch (error) {
+      Logger.error('Error closing Redis connection:', error);
+    }
+  });
+
+  await Promise.all(closePromises);
+  activeConnections.clear();
+  Logger.info('All Redis connections closed');
+}
+
+/**
+ * Get the number of active connections (for monitoring)
+ */
+export function getActiveConnectionCount(): number {
+  return activeConnections.size;
+}
+
+// Handle shutdown properly
 process.on('beforeExit', async () => {
-  if (redisUrl) {
-    const connection = createRedisConnection();
-    await connection.quit();
-    console.log('Redis connection closed');
-  }
+  await closeAllRedisConnections();
+});
 
-  if (redisUrl) {
-    const subscriber = createRedisSubscriber();
-    await subscriber.quit();
-    console.log('Redis subscriber connection closed');
-  }
+process.on('SIGINT', async () => {
+  await closeAllRedisConnections();
+  process.exit(0);
+});
 
-  if (redisUrl) {
-    const publisher = createRedisPublisher();
-    await publisher.quit();
-    console.log('Redis publisher connection closed');
-  }
+process.on('SIGTERM', async () => {
+  await closeAllRedisConnections();
+  process.exit(0);
 });
