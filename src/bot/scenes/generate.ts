@@ -66,9 +66,9 @@ async function showInitialOptions(ctx: MyContext): Promise<void> {
   const stylizePhotoText = ctx.i18n.t('bot:generate.effect_photo');
   const videoEffectsText = ctx.i18n.t('bot:generate.effect_video');
   const stylizeLogoText = ctx.i18n.t('bot:generate.stylize_logo');
-  const stylizeBannerText = ctx.i18n.t('bot:generate.stylize_banner');
-  const stylizeRoomDesign = ctx.i18n.t('bot:generate.room_design');
-  const jointPhoto = ctx.i18n.t('bot:generate.joint_photo');
+  // const stylizeBannerText = ctx.i18n.t('bot:generate.stylize_banner');
+  // const stylizeRoomDesign = ctx.i18n.t('bot:generate.room_design');
+  // const jointPhoto = ctx.i18n.t('bot:generate.joint_photo');
 
   await ctx.reply(ctx.i18n.t('bot:generate.select_option'), {
     parse_mode: 'HTML',
@@ -76,9 +76,9 @@ async function showInitialOptions(ctx: MyContext): Promise<void> {
       [Markup.button.callback(stylizePhotoText, 'select_photo_styling')],
       [Markup.button.callback(videoEffectsText, 'select_video_effects')],
       [Markup.button.callback(stylizeLogoText, 'select_logo_styling')],
-      [Markup.button.callback(stylizeBannerText, 'select_banner_styling')],
-      [Markup.button.callback(stylizeRoomDesign, 'select_room_design')],
-      [Markup.button.callback(jointPhoto, 'select_joint_photo')],
+      // [Markup.button.callback(stylizeBannerText, 'select_banner_styling')],
+      // [Markup.button.callback(stylizeRoomDesign, 'select_room_design')],
+      // [Markup.button.callback(jointPhoto, 'select_joint_photo')],
     ]).reply_markup,
   });
 }

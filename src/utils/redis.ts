@@ -35,6 +35,10 @@ const connectionOptions = {
 // Track all Redis connections for cleanup
 const activeConnections = new Set<Redis>();
 
+// Add connection throttling to prevent race conditions
+let connectionCreationCount = 0;
+const MAX_CONCURRENT_CONNECTIONS = 10;
+
 /**
  * Creates and returns a general Redis connection.
  * Caller is responsible for handling errors and closing the connection.
@@ -42,7 +46,17 @@ const activeConnections = new Set<Redis>();
 export function createRedisConnection(): Redis {
   if (!redisUrl) throw new Error('Redis URL не найден');
 
-  console.log('Creating Redis connection...');
+  if (connectionCreationCount >= MAX_CONCURRENT_CONNECTIONS) {
+    throw new Error(
+      `Too many Redis connections (${connectionCreationCount}). Max allowed: ${MAX_CONCURRENT_CONNECTIONS}`
+    );
+  }
+
+  connectionCreationCount++;
+  console.log(
+    `Creating Redis connection... (${connectionCreationCount}/${MAX_CONCURRENT_CONNECTIONS})`
+  );
+
   const connection = new Redis(redisUrl, connectionOptions);
 
   connection.on('error', err => {
@@ -51,15 +65,16 @@ export function createRedisConnection(): Redis {
   });
 
   connection.on('connect', () => {
-    console.log('Redis connection established');
+    console.log(`Redis connection established (${connectionCreationCount})`);
   });
 
   connection.on('ready', () => {
-    console.log('Redis connection ready');
+    console.log(`Redis connection ready (${connectionCreationCount})`);
   });
 
   connection.on('close', () => {
-    console.log('Redis connection closed');
+    connectionCreationCount = Math.max(0, connectionCreationCount - 1);
+    console.log(`Redis connection closed (remaining: ${connectionCreationCount})`);
     activeConnections.delete(connection);
   });
 
@@ -181,12 +196,15 @@ export async function testRedisConnection(): Promise<boolean> {
     return false;
   }
 
+  // Add small delay to avoid race conditions with other connections
+  await new Promise(resolve => setTimeout(resolve, 500));
+
   console.log('Testing Redis connection...');
   let testConnection: Redis | null = null;
 
   try {
     testConnection = new Redis(redisUrl, {
-      connectTimeout: 5000,
+      connectTimeout: 8000, // Increased timeout
       lazyConnect: true,
       // Support both IPv4 and IPv6 - let system decide based on DNS
       retryStrategy: () => null, // Don't retry for test
@@ -194,10 +212,10 @@ export async function testRedisConnection(): Promise<boolean> {
 
     await testConnection.connect();
     await testConnection.ping();
-    console.log('Redis connection test successful');
+    console.log('✅ Redis connection test successful');
     return true;
   } catch (error) {
-    console.error('Redis connection test failed:', error.message);
+    console.error('❌ Redis connection test failed:', error.message);
 
     // Log additional details for debugging
     if (error.code === 'ENOTFOUND') {
@@ -205,6 +223,7 @@ export async function testRedisConnection(): Promise<boolean> {
       console.error('1. Redis service is running');
       console.error('2. REDIS_URL environment variable is correct');
       console.error('3. Network connectivity to Redis host');
+      console.error('4. Try using external Redis URL instead of internal');
     }
 
     return false;

@@ -22,7 +22,7 @@ export const dbConfig = {
 
 // Redis configuration
 export const redisConfig = {
-  url: process.env.REDIS_URL || 'redis://localhost:6379',
+  url: process.env.REDIS_URL || process.env.REDIS_PUBLIC_URL || 'redis://localhost:6379',
   maxRetriesPerRequest: 1,
   reconnectOnError: false,
   lazyConnect: true,
