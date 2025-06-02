@@ -156,6 +156,20 @@ async function downloadMultipleTelegramFiles(fileIds: string[]): Promise<string[
  * Processes an image effect generation job.
  */
 async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void> {
+  // Логируем начало обработки задания
+  Logger.info(`🚀 [ImageEffectWorker] Начинаем обработку задания ${job.id}`, {
+    jobId: job.id,
+    generationId: job.data.generationId,
+    userId: job.data.userId,
+    effect: job.data.effect,
+    logoEffect: job.data.logoEffect,
+    bannerEffect: job.data.bannerEffect,
+    fileIds: job.data.fileIds,
+    apiProvider: job.data.apiProvider,
+    chatId: job.data.chatId,
+    messageId: job.data.messageId,
+  });
+
   const {
     generationId,
     userId,
@@ -177,14 +191,17 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
   let localFilePath: string | null = null;
   let localFilePaths: string[] = [];
   let finalOutputPath: string | null = null;
+  const effectName = effect || logoEffect || bannerEffect || roomDesignEffect || jointPhotoEffect;
 
   try {
     // 1. Update status to PROCESSING
+    Logger.info(`📝 [ImageEffectWorker] Обновляем статус генерации ${generationId} на PROCESSING`);
     await prisma.generation.update({
       where: { id: generationId },
       data: { status: GenerationStatus.PROCESSING },
     });
 
+    Logger.info(`📤 [ImageEffectWorker] Отправляем статус-сообщение пользователю в чат ${chatId}`);
     await redisPublisher.publish(
       'bot:status_update',
       JSON.stringify({
@@ -196,29 +213,51 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
 
     // 2. Download the original images from Telegram via bot core or create
     if (fileIds) {
+      Logger.info(`📥 [ImageEffectWorker] Скачиваем ${fileIds.length} файлов из Telegram`, {
+        fileIds,
+      });
       localFilePaths = await downloadMultipleTelegramFiles(fileIds);
+      Logger.info(`✅ [ImageEffectWorker] Файлы скачаны успешно`, { localFilePaths });
     } else {
+      Logger.info(`📂 [ImageEffectWorker] Создание изображения без входных файлов`);
       localFilePath = path.join(UPLOAD_DIR, 'temp');
     }
 
     if (localFilePaths && localFilePaths.length === 1) {
       localFilePath = localFilePaths[0];
+      Logger.info(`📄 [ImageEffectWorker] Используем единственный файл: ${localFilePath}`);
     }
 
     // 3. Apply effect based on type
+    Logger.info(`🎨 [ImageEffectWorker] Применяем эффект: ${effectName}`, {
+      effect,
+      logoEffect,
+      bannerEffect,
+      apiProvider,
+      fileIds: !!fileIds,
+    });
+
     await redisPublisher.publish(
       'bot:status_update',
       JSON.stringify({
         chatId,
         messageId,
-        text: getMessage('applying_effect', language, {
-          effect: effect || logoEffect || bannerEffect || roomDesignEffect || jointPhotoEffect,
-        }),
+        text: getMessage('applying_effect', language, { effect: effectName }),
       })
     );
 
     // Generate image with OpenAI service
     if (!fileIds) {
+      Logger.info(`🖼️ [ImageEffectWorker] Создание изображения через OpenAI createImageOpenAI`, {
+        localFilePath,
+        effect,
+        resolution,
+        logoEffect,
+        bannerEffect,
+        roomDesignEffect,
+        prompt,
+      });
+
       finalOutputPath = await createImageOpenAI(
         localFilePath,
         effect,
@@ -228,17 +267,38 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
         roomDesignEffect,
         prompt
       );
+
+      Logger.info(`✅ [ImageEffectWorker] Изображение создано через OpenAI`, { finalOutputPath });
     } else if (FAL_AI_EFFECTS.includes(effect)) {
       // Process with FAL AI
+      Logger.info(`🤖 [ImageEffectWorker] Обработка через FAL AI`, { effect, localFilePath });
       finalOutputPath = await applyImageEffect(localFilePath, effect, resolution as Resolution);
+      Logger.info(`✅ [ImageEffectWorker] Изображение обработано через FAL AI`, {
+        finalOutputPath,
+      });
     } else if (OPENAI_EFFECTS.includes(effect) && apiProvider === 'openai') {
       // Pass the resolution to OpenAI service
+      Logger.info(
+        `🎨 [ImageEffectWorker] Редактирование изображения через OpenAI editImageOpenAI`,
+        {
+          effect,
+          localFilePath,
+          resolution,
+          logoEffect: job.data.logoEffect,
+          apiProvider,
+        }
+      );
+
       finalOutputPath = await editImageOpenAI(
         localFilePath,
         effect,
         resolution as Resolution,
         job.data.logoEffect
       );
+
+      Logger.info(`✅ [ImageEffectWorker] Изображение отредактировано через OpenAI`, {
+        finalOutputPath,
+      });
     } else if (
       job.data.logoEffect ||
       job.data.bannerEffect ||
@@ -252,6 +312,15 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
         job.data.jointPhotoEffect;
 
       if (apiProvider === 'openai') {
+        Logger.info(`🏷️ [ImageEffectWorker] Применение логотипа/баннера через OpenAI`, {
+          effect,
+          apiProvider,
+          localFilePath,
+          resolution,
+          effectObject,
+          prompt,
+        });
+
         finalOutputPath = await editImageOpenAI(
           localFilePath,
           effect,
@@ -263,36 +332,86 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
           job.data.effectObject,
           prompt
         );
+
+        Logger.info(`✅ [ImageEffectWorker] Логотип/баннер применен через OpenAI`, {
+          finalOutputPath,
+        });
       } else if (apiProvider === 'runway') {
+        Logger.info(`🎬 [ImageEffectWorker] Обработка через Runway`, {
+          effect,
+          localFilePaths,
+          prompt,
+          resolution,
+        });
+
         finalOutputPath = await generateJointPhoto(
           localFilePaths,
           prompt,
           resolution as Resolution
         );
+
+        Logger.info(`✅ [ImageEffectWorker] Изображение обработано через Runway`, {
+          finalOutputPath,
+        });
       }
     } else {
-      throw new Error(`Unsupported effect type: ${effect}`);
+      const errorMsg = `Unsupported effect type: ${effect}`;
+      Logger.error(`❌ [ImageEffectWorker] ${errorMsg}`, {
+        effect,
+        logoEffect,
+        bannerEffect,
+        roomDesignEffect,
+        jointPhotoEffect,
+        apiProvider,
+        fileIds: !!fileIds,
+      });
+      throw new Error(errorMsg);
+    }
+
+    if (!finalOutputPath) {
+      const errorMsg = 'No output path returned from effect processing';
+      Logger.error(`❌ [ImageEffectWorker] ${errorMsg}`, {
+        effect,
+        apiProvider,
+        fileIds: !!fileIds,
+      });
+      throw new Error(errorMsg);
     }
 
     // 4. Save the final image to the user's directory
     const outputDir = path.join(UPLOAD_DIR, userId, generationId);
+    Logger.info(`📁 [ImageEffectWorker] Создаем директорию пользователя: ${outputDir}`);
     await fs.mkdir(outputDir, { recursive: true });
 
     // 5. Copy the final image to the user's directory if needed
     if (finalOutputPath !== path.join(outputDir, 'final_effect_image.jpg')) {
       const userFilePath = path.join(outputDir, 'final_effect_image.jpg');
+      Logger.info(`📋 [ImageEffectWorker] Копируем финальное изображение`, {
+        from: finalOutputPath,
+        to: userFilePath,
+      });
+
       const fileContent = await fs.readFile(finalOutputPath);
       await fs.writeFile(userFilePath, fileContent);
       finalOutputPath = userFilePath;
+
+      Logger.info(`✅ [ImageEffectWorker] Файл скопирован успешно: ${finalOutputPath}`);
+    } else {
+      Logger.info(`📄 [ImageEffectWorker] Файл уже в правильной директории: ${finalOutputPath}`);
     }
 
     // 6. Decrement user generations (atomic operation)
+    Logger.info(`📊 [ImageEffectWorker] Уменьшаем количество генераций пользователя ${userId}`);
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: { remainingGenerations: { decrement: 1 } },
     });
+    Logger.info(
+      `✅ [ImageEffectWorker] Генерации обновлены, осталось: ${updatedUser.remainingGenerations}`
+    );
 
     // 7. Update Generation record to COMPLETED
+    Logger.info(`💾 [ImageEffectWorker] Обновляем статус генерации ${generationId} на COMPLETED`);
     await prisma.generation.update({
       where: { id: generationId },
       data: {
@@ -300,8 +419,17 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
         imageUrls: [finalOutputPath],
       },
     });
+    Logger.info(`✅ [ImageEffectWorker] Статус генерации обновлен на COMPLETED`);
 
     // 8. Notify user via Redis with the effect results
+    Logger.info(`📤 [ImageEffectWorker] Отправляем результат пользователю`, {
+      chatId,
+      userId,
+      generationId,
+      effect: effectName,
+      finalOutputPath,
+    });
+
     await redisPublisher.publish(
       'bot:send_effect',
       JSON.stringify({
@@ -317,8 +445,19 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
         effect,
       })
     );
+
+    Logger.info(
+      `🎉 [ImageEffectWorker] Задание ${job.id} для генерации ${generationId} успешно завершено!`
+    );
   } catch (error) {
-    Logger.error(`Job ${job.id} failed for generation ${generationId}`, { error, effect, userId });
+    Logger.error(`💥 [ImageEffectWorker] Job ${job.id} failed for generation ${generationId}`, {
+      error: error.message,
+      stack: error.stack,
+      effect: effectName,
+      userId,
+      fileIds,
+      apiProvider,
+    });
 
     // Update status to FAILED
     await prisma.generation
@@ -385,15 +524,52 @@ function createWorker() {
 if (redisConfig) {
   worker = createWorker();
 
-  worker.on('failed', (job: Job<ImageEffectJobData>, err: Error) => {
-    Logger.error(`Job ${job.id} failed for generation ${job.data.generationId}`, {
-      error: err,
-      attemptsMade: job.attemptsMade,
+  // Добавляем обработчики событий для диагностики
+  worker.on('active', (job: Job<ImageEffectJobData>) => {
+    Logger.info(`▶️ [ImageEffectWorker] Задание ${job.id} начато`, {
+      jobId: job.id,
+      generationId: job.data.generationId,
+      effect: job.data.effect,
+      userId: job.data.userId,
     });
   });
 
+  worker.on('completed', (job: Job<ImageEffectJobData>) => {
+    Logger.info(`✅ [ImageEffectWorker] Задание ${job.id} завершено успешно`, {
+      jobId: job.id,
+      generationId: job.data.generationId,
+    });
+  });
+
+  worker.on('failed', (job: Job<ImageEffectJobData>, err: Error) => {
+    Logger.error(
+      `❌ [ImageEffectWorker] Job ${job.id} failed for generation ${job.data.generationId}`,
+      {
+        error: err.message,
+        stack: err.stack,
+        attemptsMade: job.attemptsMade,
+        jobData: job.data,
+      }
+    );
+  });
+
   worker.on('error', err => {
-    Logger.error('BullMQ Worker Error', { error: err });
+    Logger.error('💥 [ImageEffectWorker] BullMQ Worker Error', {
+      error: err.message,
+      stack: err.stack,
+    });
+  });
+
+  worker.on('ready', () => {
+    Logger.info('🟢 [ImageEffectWorker] Worker готов к обработке заданий');
+  });
+
+  worker.on('paused', () => {
+    Logger.warn('⏸️ [ImageEffectWorker] Worker приостановлен');
+  });
+
+  worker.on('resumed', () => {
+    Logger.info('▶️ [ImageEffectWorker] Worker возобновлен');
   });
 
   console.log('✅ Image effect worker initialized');
@@ -405,14 +581,18 @@ if (redisConfig) {
 const gracefulShutdown = async () => {
   try {
     if (worker) {
+      Logger.info('🛑 [ImageEffectWorker] Закрываем worker...');
       await worker.close();
     }
 
     if (redisPublisher) {
+      Logger.info('🛑 [ImageEffectWorker] Закрываем Redis publisher...');
       await redisPublisher.quit();
     }
+
+    Logger.info('✅ [ImageEffectWorker] Graceful shutdown завершен');
   } catch (error) {
-    Logger.error('Error during worker shutdown:', error);
+    Logger.error('❌ [ImageEffectWorker] Error during worker shutdown:', error);
     process.exit(1);
   }
 };

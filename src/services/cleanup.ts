@@ -5,6 +5,7 @@ import cron from 'node-cron';
 import { checkExpiredSubscriptions } from './expired-subscription';
 import { cleanupPendingPayments } from './payment';
 import { Logger } from '../utils/rollbar.logger';
+import { cleanStuckTasks } from '../utils/queue-cleanup';
 
 /**
  * Delete a specific image file
@@ -138,8 +139,10 @@ export async function cleanupPayments(): Promise<void> {
  * @returns The scheduled cron job
  */
 export function setupCleanupTask(): cron.ScheduledTask {
-  // Run every hour: file cleanup and subscription check
+  // Run every hour: file cleanup, subscription check, and stuck tasks cleanup
   const cronJob = cron.schedule('0 * * * *', async () => {
+    Logger.info('🕐 Запуск периодических задач очистки...');
+
     // Clean up old image files
     await cleanupOldFiles(3600000).catch(error => {
       Logger.error(error, {
@@ -160,6 +163,16 @@ export function setupCleanupTask(): cron.ScheduledTask {
         task: 'payment-cleanup',
       });
     });
+
+    // Clean up stuck tasks (older than 30 minutes)
+    await cleanStuckTasks(30).catch(error => {
+      Logger.error(error, {
+        context: 'scheduled-cleanup',
+        task: 'stuck-tasks-cleanup',
+      });
+    });
+
+    Logger.info('✅ Периодические задачи очистки завершены');
   });
 
   return cronJob;
@@ -171,10 +184,32 @@ export function setupCleanupTask(): cron.ScheduledTask {
  */
 export async function runAllCleanupTasks(): Promise<void> {
   try {
+    Logger.info('🚀 Запуск всех задач очистки вручную...');
+
     // Run all cleanup tasks in parallel for efficiency
-    const results = await Promise.allSettled([cleanupOldFiles(3600000), checkSubscriptions()]);
+    const results = await Promise.allSettled([
+      cleanupOldFiles(3600000),
+      checkSubscriptions(),
+      cleanupPayments(),
+      cleanStuckTasks(30), // Очистка зависших задач старше 30 минут
+    ]);
 
     // Log results
+    results.forEach((result, index) => {
+      const taskNames = [
+        'file-cleanup',
+        'subscription-check',
+        'payment-cleanup',
+        'stuck-tasks-cleanup',
+      ];
+      if (result.status === 'rejected') {
+        Logger.error(`❌ Задача ${taskNames[index]} провалилась:`, result.reason);
+      } else {
+        Logger.info(`✅ Задача ${taskNames[index]} выполнена успешно`);
+      }
+    });
+
+    Logger.info('🎉 Все задачи очистки завершены');
   } catch (error) {
     Logger.error(error, { context: 'manual-cleanup' });
   }

@@ -8,6 +8,7 @@ export interface ImageEffectJobData {
   generationId: string;
   userId: string;
   fileIds?: string[];
+  fileId?: string; // Обратная совместимость с старым форматом
   effect?: EffectType;
   logoEffect?: string;
   bannerEffect?: string;
@@ -15,6 +16,7 @@ export interface ImageEffectJobData {
   jointPhotoEffect?: string;
   effectObject?: string; // Type of object; logo, banner erc
   prompt?: string;
+  description?: string; // Дополнительное описание для эффектов
   chatId: string;
   messageId: number;
   language: string;
@@ -103,15 +105,48 @@ if (imageEffectQueue) {
  * @returns The added job instance.
  */
 export async function addImageEffectJob(data: ImageEffectJobData) {
+  Logger.info('🚀 [ImageEffectQueue] Добавляем новое задание в очередь', {
+    generationId: data.generationId,
+    userId: data.userId,
+    effect: data.effect,
+    logoEffect: data.logoEffect,
+    bannerEffect: data.bannerEffect,
+    fileIds: data.fileIds,
+    apiProvider: data.apiProvider,
+    chatId: data.chatId,
+    messageId: data.messageId,
+  });
+
   if (!imageEffectQueue) {
-    throw new Error('Image effect queue not available - Redis connection failed');
+    const errorMsg = 'Image effect queue not available - Redis connection failed';
+    Logger.error(`❌ [ImageEffectQueue] ${errorMsg}`);
+    throw new Error(errorMsg);
   }
 
   try {
-    const job = await imageEffectQueue.add(`generate-${data.effect}-${data.generationId}`, data);
+    const jobName = `generate-${data.effect || data.logoEffect || data.bannerEffect}-${data.generationId}`;
+    Logger.info(`📝 [ImageEffectQueue] Создаем задание с именем: ${jobName}`);
+
+    const job = await imageEffectQueue.add(jobName, data);
+
+    Logger.info(`✅ [ImageEffectQueue] Задание успешно добавлено в очередь`, {
+      jobId: job.id,
+      jobName,
+      generationId: data.generationId,
+      queueName: imageEffectQueue.name,
+    });
+
     return job;
   } catch (error) {
-    Logger.error(`Error adding job to ${QUEUE_NAME} queue`, { error, data });
+    Logger.error(`❌ [ImageEffectQueue] Error adding job to ${imageEffectQueue.name} queue`, {
+      error: error.message,
+      stack: error.stack,
+      data: {
+        generationId: data.generationId,
+        userId: data.userId,
+        effect: data.effect,
+      },
+    });
     throw error; // Re-throw error to be handled by the caller
   }
 }

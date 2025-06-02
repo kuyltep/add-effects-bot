@@ -3,6 +3,23 @@ import path from 'path';
 import { Logger } from '../utils/rollbar.logger';
 import fs from 'fs';
 
+// Импортируем worker'ы напрямую для запуска в основном процессе
+console.log("🔧 [Workers] Начинаем импорт worker'ов...");
+
+console.log('🔧 [Workers] Импортируем imageEffectWorker...');
+import '../queues/imageEffectWorker';
+console.log('✅ [Workers] imageEffectWorker импортирован');
+
+console.log('🔧 [Workers] Импортируем videoWorker...');
+import '../queues/videoWorker';
+console.log('✅ [Workers] videoWorker импортирован');
+
+console.log('🔧 [Workers] Импортируем upgradeWorker...');
+import '../queues/upgradeWorker';
+console.log('✅ [Workers] upgradeWorker импортирован');
+
+console.log("✅ [Workers] Все worker'ы импортированы успешно");
+
 // Track active workers
 const activeWorkers: Worker[] = [];
 
@@ -97,13 +114,27 @@ function startWorker(workerData: { name: string; script: string }) {
   }
 }
 
-// Start all workers
+// Start all workers - ВРЕМЕННО в основном процессе для отладки
 export function launchWorkers() {
-  workers.forEach(startWorker);
+  console.log("🐛 [DEBUG] Запускаем worker'ы в основном процессе для отладки...");
+
+  // Worker'ы уже импортированы выше и должны инициализироваться автоматически
+  console.log("✅ [DEBUG] Worker'ы загружены в основном процессе");
+
+  // TODO: После отладки вернуть запуск в threads:
+  // workers.forEach(startWorker);
 }
 
 // Gracefully stop all workers
 export async function stopWorkers(): Promise<boolean> {
+  console.log("🐛 [DEBUG] Останавливаем worker'ы в основном процессе...");
+
+  // TODO: Добавить код для graceful shutdown worker'ов в основном процессе
+  // Пока что просто возвращаем true
+  return true;
+
+  // Старый код для worker threads:
+  /*
   let success = true;
   const shutdownPromises = activeWorkers.map(worker => {
     return new Promise<void>(resolve => {
@@ -130,6 +161,7 @@ export async function stopWorkers(): Promise<boolean> {
   }
   activeWorkers.length = 0; // Clear the array
   return success;
+  */
 }
 
 // Optional: Handle main process signals for graceful shutdown
