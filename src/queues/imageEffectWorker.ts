@@ -7,11 +7,41 @@ import { GenerationStatus, Resolution } from '@prisma/client';
 import fs from 'fs/promises';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
-import { createRedisPublisher } from '../utils/redis';
+import { createRedisPublisher, createRedisConnection } from '../utils/redis';
 import { applyImageEffect } from '../services/fal-ai';
 import { isMainThread, parentPort, workerData } from 'worker_threads';
 import { createImageOpenAI, editImageOpenAI } from '../services/openai';
 // import { generateJointPhoto } from '../services/runway';
+// Initialize Redis connection with Railway-specific settings
+const redisConfig = config.redis.url
+  ? (() => {
+      const redisURL = new URL(config.redis.url);
+      const redisConfig: any = {
+        host: redisURL.hostname,
+        port: parseInt(redisURL.port) || 6379,
+        maxRetriesPerRequest: null, // BullMQ требует null
+        lazyConnect: true,
+      };
+
+      // Добавляем username/password только если они есть (для локальной разработки могут отсутствовать)
+      if (redisURL.username) {
+        redisConfig.username = redisURL.username;
+      }
+      if (redisURL.password) {
+        redisConfig.password = redisURL.password;
+      }
+
+      // Railway требует dual stack lookup только для внутренних соединений
+      if (
+        redisURL.hostname.includes('railway.internal') ||
+        redisURL.hostname.includes('rlwy.net')
+      ) {
+        redisConfig.family = 0;
+      }
+
+      return redisConfig;
+    })()
+  : undefined;
 
 // Constants
 const QUEUE_NAME = 'image-effect-generation';
@@ -462,7 +492,7 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
 function createWorker() {
   try {
     return new Worker<ImageEffectJobData>(QUEUE_NAME, processImageEffectJob, {
-      connection: redisConnection,
+      connection: redisConfig,
       concurrency: parseInt(process.env.EFFECT_WORKER_CONCURRENCY || '3', 10),
       stalledInterval: 10000, // Check for stalled jobs every 30 seconds
       lockDuration: 300000, // Lock jobs for 5 minutes

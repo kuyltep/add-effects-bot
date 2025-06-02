@@ -15,7 +15,6 @@ const activeConnections = new Set<Redis>();
 
 // Connection options
 const connectionOptions = {
-  maxRetriesPerRequest: 1,
   enableReadyCheck: true,
   connectTimeout: 10000,
   lazyConnect: true,
@@ -56,16 +55,6 @@ function registerConnection(connection: Redis, context: string): Redis {
 export function createRedisConnection(): Redis {
   if (!redisUrl) throw new Error('Redis URL не найден');
 
-  if (connectionCreationCount >= MAX_CONCURRENT_CONNECTIONS) {
-    throw new Error(
-      `Too many Redis connections (${connectionCreationCount}). Max allowed: ${MAX_CONCURRENT_CONNECTIONS}`
-    );
-  }
-
-  connectionCreationCount++;
-  console.log(
-    `Creating Redis connection... (${connectionCreationCount}/${MAX_CONCURRENT_CONNECTIONS})`
-  );
 
   const connection = new Redis(redisUrl, connectionOptions);
   return registerConnection(connection, 'Redis Connection');

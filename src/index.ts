@@ -21,7 +21,7 @@ import botRoutes from './routes/bot';
 import healthRoutes from './routes/health';
 import { Logger } from './utils/rollbar.logger';
 import { disconnectPrisma } from './utils/prisma';
-import { closeAllRedisConnections, testRedisConnection } from './utils/redis';
+import { closeAllRedisConnections } from './utils/redis';
 import fs from 'fs';
 
 /**
@@ -339,22 +339,6 @@ function registerSignalHandlers() {
   });
 }
 
-/**
- * Check system dependencies
- */
-async function checkDependencies() {
-  console.log('Checking system dependencies...');
-
-  // Test Redis connection
-  const redisOk = await testRedisConnection();
-  if (!redisOk) {
-    console.warn('⚠️  Redis connection failed - check the detailed logs above');
-    console.warn('   Application will continue without Redis-dependent features');
-  }
-
-  console.log('Dependencies check completed');
-  return { redisOk };
-}
 
 /**
  * Start the application
@@ -362,7 +346,6 @@ async function checkDependencies() {
 async function startApplication() {
   try {
     // Check dependencies first
-    const dependencies = await checkDependencies();
 
     // Create and configure the server
     const server = createServer();
@@ -383,11 +366,7 @@ async function startApplication() {
 
     // Initialize workers (only if Redis is available)
     let workersStarted = false;
-    if (dependencies.redisOk) {
       workersStarted = await initializeWorkers();
-    } else {
-      console.warn('Skipping workers initialization due to Redis connection issues');
-    }
 
     initializeCleanupTasks();
 
@@ -396,24 +375,7 @@ async function startApplication() {
 
     // Initialize the Telegram bot (only if Redis is available for pub/sub)
     let botStarted = false;
-    if (dependencies.redisOk) {
       botStarted = await initializeBot();
-    } else {
-      console.warn('Skipping bot initialization due to Redis connection issues');
-    }
-
-    if (!botStarted && dependencies.redisOk) {
-      console.warn('Bot failed to start, but continuing with other services');
-    }
-
-    if (!workersStarted && dependencies.redisOk) {
-      console.warn('Workers failed to initialize, job processing may not work correctly');
-    }
-
-    console.log('🚀 Application started successfully!');
-    if (!dependencies.redisOk) {
-      console.log('⚠️  Note: Some features disabled due to Redis connection issues');
-    }
 
     return true;
   } catch (error) {
