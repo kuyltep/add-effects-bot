@@ -20,9 +20,7 @@ const connectionOptions = {
   enableReadyCheck: true,
   connectTimeout: 10000,
   lazyConnect: true,
-  // Let the system decide between IPv4/IPv6 based on DNS resolution
-  // Don't force family, support both IPv4 and IPv6
-  // Disable automatic reconnection on shutdown
+  family: 6,
   retryStrategy: (times: number) => {
     console.log(`Redis retry attempt ${times}`);
     // Only retry a few times, then give up
