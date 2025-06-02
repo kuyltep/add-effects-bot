@@ -2,15 +2,31 @@ import { Worker, Job } from 'bullmq';
 import { VideoGenerationJob } from './videoQueue';
 import { GenerationStatus } from '@prisma/client';
 import { prisma } from '../utils/prisma';
-import { createRedisConnection, createRedisPublisher } from '../utils/redis';
+import { createRedisPublisher } from '../utils/redis';
 import fs from 'fs';
 import { generateVideoFromImage } from '../services/replicate';
 import i18next from '../i18n';
 import { isMainThread, parentPort, workerData } from 'worker_threads';
 import path from 'path';
+import config from '../config';
 
-// Initialize resources
-const redisConnection = createRedisConnection();
+// Initialize Redis connection with Railway-specific settings
+const redisConfig = config.redis.url
+  ? (() => {
+      const redisURL = new URL(config.redis.url);
+      return {
+        family: 0, // Railway требует dual stack lookup
+        host: redisURL.hostname,
+        port: parseInt(redisURL.port) || 6379,
+        username: redisURL.username,
+        password: redisURL.password,
+        maxRetriesPerRequest: 1,
+        lazyConnect: true,
+      };
+    })()
+  : undefined;
+
+// Create Redis publisher for sending messages to bot
 const redisPublisher = createRedisPublisher();
 
 // Define result type
@@ -24,8 +40,12 @@ const VIDEO_GENERATION_COST = +process.env.VIDEO_GENERATION_COST;
 
 // Create and configure the worker
 function createWorker() {
+  if (!redisConfig) {
+    throw new Error('Redis not configured - cannot create video worker');
+  }
+
   return new Worker<VideoGenerationJob, VideoResult>('video-generation', processVideoJob, {
-    connection: redisConnection,
+    connection: redisConfig,
     concurrency: parseInt(process.env.VIDEO_WORKER_CONCURRENCY || '1', 10),
     stalledInterval: 10000, // Check for stalled jobs every 30 seconds
     lockDuration: 300000, // Lock jobs for 5 minutes
@@ -286,7 +306,6 @@ const gracefulShutdown = async () => {
   console.info('Shutting down video worker...');
   await worker.close();
   await redisPublisher.quit();
-  await redisConnection.quit();
   console.info('Video worker shut down successfully');
 
   // If running in a worker thread, notify the parent that we're shutting down

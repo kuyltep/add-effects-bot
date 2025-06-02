@@ -348,11 +348,10 @@ async function checkDependencies() {
   // Test Redis connection
   const redisOk = await testRedisConnection();
   if (!redisOk) {
-    console.warn('⚠️  Redis connection failed - some features may not work properly');
-    console.warn('   Check REDIS_URL environment variable and Redis service status');
+    console.warn('⚠️  Redis connection failed - check the detailed logs above');
+    console.warn('   Application will continue without Redis-dependent features');
   }
 
-  // Could add database check here too
   console.log('Dependencies check completed');
   return { redisOk };
 }

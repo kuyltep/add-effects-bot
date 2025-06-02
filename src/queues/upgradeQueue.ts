@@ -1,6 +1,5 @@
 import { Queue } from 'bullmq';
 import config from '../config';
-import { createRedisConnection } from '../utils/redis';
 
 // Define the UpgradeGenerationJob type
 export interface UpgradeGenerationJob {
@@ -12,21 +11,37 @@ export interface UpgradeGenerationJob {
   language: string;
 }
 
-const redisConnection = createRedisConnection();
+// Create Redis connection for BullMQ with Railway-specific settings
+const redisConfig = config.redis.url
+  ? (() => {
+      const redisURL = new URL(config.redis.url);
+      return {
+        family: 0, // Railway требует dual stack lookup
+        host: redisURL.hostname,
+        port: parseInt(redisURL.port) || 6379,
+        username: redisURL.username,
+        password: redisURL.password,
+        maxRetriesPerRequest: 1,
+        lazyConnect: true,
+      };
+    })()
+  : undefined;
 
 // Create the upgrade generation queue
-const upgradeQueue = new Queue<UpgradeGenerationJob>('upgrade-generation', {
-  connection: redisConnection,
-  defaultJobOptions: {
-    attempts: config.queue.jobRetryAttempts,
-    backoff: {
-      type: 'exponential',
-      delay: config.queue.jobRetryDelay,
-    },
-    removeOnComplete: config.queue.removeCompletedAfter,
-    removeOnFail: config.queue.removeFailedAfter,
-  },
-});
+const upgradeQueue = redisConfig
+  ? new Queue<UpgradeGenerationJob>('upgrade-generation', {
+      connection: redisConfig,
+      defaultJobOptions: {
+        attempts: config.queue.jobRetryAttempts,
+        backoff: {
+          type: 'exponential',
+          delay: config.queue.jobRetryDelay,
+        },
+        removeOnComplete: config.queue.removeCompletedAfter,
+        removeOnFail: config.queue.removeFailedAfter,
+      },
+    })
+  : null;
 
 /**
  * Add a new upgrade generation job to the queue
@@ -34,6 +49,9 @@ const upgradeQueue = new Queue<UpgradeGenerationJob>('upgrade-generation', {
  * @returns Job ID
  */
 export async function addUpgradeGenerationJob(data: UpgradeGenerationJob): Promise<string> {
+  if (!upgradeQueue) {
+    throw new Error('Upgrade queue not available - Redis connection failed');
+  }
   const job = await upgradeQueue.add('enhance-image', data);
   return job.id || '';
 }
@@ -44,6 +62,9 @@ export async function addUpgradeGenerationJob(data: UpgradeGenerationJob): Promi
  * @returns Job status or null if job not found
  */
 export async function getUpgradeJobStatus(jobId: string): Promise<string | null> {
+  if (!upgradeQueue) {
+    return null;
+  }
   const job = await upgradeQueue.getJob(jobId);
 
   if (!job) {

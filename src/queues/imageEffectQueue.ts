@@ -2,7 +2,6 @@ import { Queue, Worker } from 'bullmq';
 import config from '../config';
 import { EffectType } from '../types';
 import { Logger } from '../utils/rollbar.logger';
-import { createRedisConnection } from '../utils/redis';
 
 // Define the job data structure for this queue
 export interface ImageEffectJobData {
@@ -25,25 +24,40 @@ export interface ImageEffectJobData {
 
 const QUEUE_NAME = 'image-effect-generation';
 
-// Create a Redis connection using utility function
-const redisConnection = createRedisConnection();
-
 // API providers
 export type API_PROVIDER = 'openai' | 'fal-ai' | 'runway' | 'gap';
 
+// Create Redis connection for BullMQ with Railway-specific settings
+const redisConfig = config.redis.url
+  ? (() => {
+      const redisURL = new URL(config.redis.url);
+      return {
+        family: 0, // Railway требует dual stack lookup
+        host: redisURL.hostname,
+        port: parseInt(redisURL.port) || 6379,
+        username: redisURL.username,
+        password: redisURL.password,
+        maxRetriesPerRequest: 1,
+        lazyConnect: true,
+      };
+    })()
+  : undefined;
+
 // Create the BullMQ queue instance
-export const imageEffectQueue = new Queue<ImageEffectJobData>(QUEUE_NAME, {
-  connection: redisConnection,
-  defaultJobOptions: {
-    attempts: config.queue.jobRetryAttempts, // Use global config
-    backoff: {
-      type: 'exponential',
-      delay: config.queue.jobRetryDelay, // Use global config
-    },
-    removeOnComplete: { age: config.queue.removeCompletedAfter },
-    removeOnFail: { age: config.queue.removeFailedAfter },
-  },
-});
+export const imageEffectQueue = redisConfig
+  ? new Queue<ImageEffectJobData>(QUEUE_NAME, {
+      connection: redisConfig,
+      defaultJobOptions: {
+        attempts: config.queue.jobRetryAttempts, // Use global config
+        backoff: {
+          type: 'exponential',
+          delay: config.queue.jobRetryDelay, // Use global config
+        },
+        removeOnComplete: { age: config.queue.removeCompletedAfter },
+        removeOnFail: { age: config.queue.removeFailedAfter },
+      },
+    })
+  : null;
 
 /**
  * Adds a job to the image effect generation queue.

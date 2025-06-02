@@ -5,13 +5,9 @@ import { Logger } from './rollbar.logger';
 // Redis connection details
 const redisUrl = config.redis.url;
 if (!redisUrl) {
-  if (process.env.REDIS_DISABLED === 'true') {
-    console.log('⚠️  Redis explicitly disabled via REDIS_DISABLED=true');
-  } else {
-    Logger.error(
-      'Критическая ошибка: Переменная окружения REDIS_URL или значение по умолчанию в config.redis.url не установлено!'
-    );
-  }
+  Logger.error(
+    'Критическая ошибка: Переменная окружения REDIS_URL или значение по умолчанию в config.redis.url не установлено!'
+  );
 }
 
 // Debug Redis URL (mask password for security)
@@ -24,7 +20,9 @@ const connectionOptions = {
   enableReadyCheck: true,
   connectTimeout: 10000,
   lazyConnect: true,
-  // DNS resolution issues on Railway - let system try both IPv4/IPv6
+  // Railway требует dual stack lookup для redis.railway.internal
+  // family: 0 означает поддержку как IPv4 так и IPv6 (dual stack)
+  family: 0,
   retryStrategy: (times: number) => {
     console.log(`Redis retry attempt ${times}`);
     // Only retry a few times, then give up
@@ -212,7 +210,8 @@ export async function testRedisConnection(): Promise<boolean> {
     testConnection = new Redis(redisUrl, {
       connectTimeout: 8000, // Increased timeout
       lazyConnect: true,
-      // Support both IPv4 and IPv6 - let system decide based on DNS
+      // Railway требует family: 0 для dual stack lookup
+      family: 0,
       retryStrategy: () => null, // Don't retry for test
     });
 
@@ -227,22 +226,21 @@ export async function testRedisConnection(): Promise<boolean> {
     // Log additional details for debugging
     if (error.code === 'ENOTFOUND') {
       console.error('\n🔍 DNS RESOLUTION FAILED:');
-      console.error('This is a Railway infrastructure issue.');
-      console.error('\n💡 POSSIBLE SOLUTIONS:');
-      console.error('1. Wait 5-10 minutes and redeploy (Railway DNS issues are usually temporary)');
-      console.error('2. Restart Redis service in Railway dashboard');
-      console.error('3. Delete and recreate Redis service');
-      console.error('4. Use external Redis provider (Redis Cloud, Upstash, etc.)');
-      console.error('5. Contact Railway support');
+      console.error('Trying Railway-specific solutions...');
+      console.error('\n💡 RAILWAY REDIS SOLUTIONS:');
+      console.error('1. Using family: 0 for dual stack lookup (current attempt)');
+      console.error('2. If still failing, try REDIS_PUBLIC_URL instead of REDIS_URL');
+      console.error('3. Ensure Redis service is in the same Railway project');
+      console.error('4. Try adding ?family=0 to REDIS_URL manually');
 
       // Extract hostname for additional info
       const hostname = error.hostname || 'unknown';
       console.error(`\n🌐 Failed hostname: ${hostname}`);
 
       if (hostname.includes('railway.internal')) {
-        console.error('→ This is Railway internal network issue');
+        console.error('→ Railway internal network issue - trying family: 0');
       } else if (hostname.includes('rlwy.net')) {
-        console.error('→ This is Railway proxy network issue');
+        console.error('→ Railway proxy network - should work with family: 0');
       }
     }
 
@@ -297,38 +295,4 @@ export async function closeAllRedisConnections(): Promise<void> {
   await Promise.all(closePromises);
   activeConnections.clear();
   console.log('All Redis connections closed');
-}
-
-/**
- * Perform DNS diagnostic checks
- */
-export async function diagnoseDNS(): Promise<void> {
-  console.log('\n🔍 DNS DIAGNOSTICS:');
-
-  const dns = require('dns').promises;
-
-  const hostsToTest = ['redis.railway.internal', 'google.com', '8.8.8.8'];
-
-  for (const host of hostsToTest) {
-    try {
-      console.log(`Testing ${host}...`);
-      const addresses = await dns.lookup(host);
-      console.log(`✅ ${host} resolves to: ${addresses.address}`);
-    } catch (error) {
-      console.error(`❌ ${host} failed: ${error.message}`);
-    }
-  }
-
-  // Test current Redis URL host
-  if (redisUrl) {
-    try {
-      const url = new URL(redisUrl.replace('redis://', 'http://'));
-      const host = url.hostname;
-      console.log(`Testing Redis host ${host}...`);
-      const addresses = await dns.lookup(host);
-      console.log(`✅ Redis host resolves to: ${addresses.address}`);
-    } catch (error) {
-      console.error(`❌ Redis host failed: ${error.message}`);
-    }
-  }
 }

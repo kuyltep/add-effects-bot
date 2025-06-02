@@ -7,7 +7,7 @@ import { GenerationStatus, Resolution } from '@prisma/client';
 import fs from 'fs/promises';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
-import { createRedisConnection, createRedisPublisher } from '../utils/redis';
+import { createRedisPublisher } from '../utils/redis';
 import { applyImageEffect } from '../services/fal-ai';
 import { isMainThread, parentPort, workerData } from 'worker_threads';
 import { createImageOpenAI, editImageOpenAI } from '../services/openai';
@@ -34,18 +34,24 @@ const OPENAI_EFFECTS = [
 ];
 const FAL_AI_EFFECTS = ['plushify', 'ghiblify', 'cartoonify'];
 
-// Initialize resources
-let redisConnection;
-let redisPublisher;
+// Initialize Redis with Railway-specific settings
+const redisConfig = config.redis.url
+  ? (() => {
+      const redisURL = new URL(config.redis.url);
+      return {
+        family: 0, // Railway требует dual stack lookup
+        host: redisURL.hostname,
+        port: parseInt(redisURL.port) || 6379,
+        username: redisURL.username,
+        password: redisURL.password,
+        maxRetriesPerRequest: 1,
+        lazyConnect: true,
+      };
+    })()
+  : undefined;
 
-function initializeRedisConnections() {
-  if (!redisConnection) {
-    redisConnection = createRedisConnection();
-  }
-  if (!redisPublisher) {
-    redisPublisher = createRedisPublisher();
-  }
-}
+// Create Redis publisher for sending messages to bot
+const redisPublisher = createRedisPublisher();
 
 // i18n translations for effect worker
 const translations = {
@@ -90,9 +96,6 @@ async function downloadTelegramFile(fileId: string): Promise<string> {
   const tempDir = path.join(UPLOAD_DIR, 'temp');
   await fs.mkdir(tempDir, { recursive: true });
   const filePath = path.join(tempDir, `${uuidv4()}-${fileId}.jpg`);
-
-  // Ensure Redis connections are initialized
-  initializeRedisConnections();
 
   // Request the bot to download the file via Redis
   await redisPublisher.publish(
@@ -157,13 +160,10 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
   } = job.data;
 
   let localFilePath: string | null = null;
-  let localFilePaths: string[] = [  ];
+  let localFilePaths: string[] = [];
   let finalOutputPath: string | null = null;
 
   try {
-    // Ensure Redis connections are initialized
-    initializeRedisConnections();
-
     // 1. Update status to PROCESSING
     await prisma.generation.update({
       where: { id: generationId },
@@ -228,7 +228,7 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
       job.data.logoEffect ||
       job.data.bannerEffect ||
       job.data.roomDesignEffect ||
-      job.data.jointPhotoEffect 
+      job.data.jointPhotoEffect
     ) {
       const effect =
         job.data.logoEffect ||
@@ -315,9 +315,6 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
         Logger.error('Failed to update generation status to FAILED', { updateErr })
       );
 
-    // Ensure Redis connections are initialized
-    initializeRedisConnections();
-
     // Notify user of failure via Redis
     await redisPublisher
       .publish(
@@ -355,11 +352,12 @@ let worker;
 
 // Create the worker
 function createWorker() {
-  // Initialize Redis connections
-  initializeRedisConnections();
+  if (!redisConfig) {
+    throw new Error('Redis not configured - cannot create image effect worker');
+  }
 
   return new Worker<ImageEffectJobData>(QUEUE_NAME, processImageEffectJob, {
-    connection: redisConnection,
+    connection: redisConfig,
     concurrency: parseInt(process.env.EFFECT_WORKER_CONCURRENCY || '3', 10),
     limiter: {
       max: 10,
@@ -391,17 +389,6 @@ const gracefulShutdown = async () => {
 
     if (redisPublisher) {
       await redisPublisher.quit();
-      redisPublisher = null;
-    }
-
-    if (redisConnection) {
-      await redisConnection.quit();
-      redisConnection = null;
-    }
-
-    // If running in a worker thread, notify the parent
-    if (!isMainThread && parentPort) {
-      parentPort.postMessage({ type: 'shutdown', success: true });
     }
   } catch (error) {
     Logger.error('Error during worker shutdown:', error);

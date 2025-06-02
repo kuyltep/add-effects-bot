@@ -1,6 +1,5 @@
 import { Queue } from 'bullmq';
 import config from '../config';
-import { createRedisConnection } from '../utils/redis';
 
 // Define the VideoGenerationJob type
 export interface VideoGenerationJob {
@@ -18,21 +17,37 @@ export interface VideoGenerationJob {
   source?: string; // Track where the video generation was initiated from
 }
 
-const redisConnection = createRedisConnection();
+// Create Redis connection for BullMQ with Railway-specific settings
+const redisConfig = config.redis.url
+  ? (() => {
+      const redisURL = new URL(config.redis.url);
+      return {
+        family: 0, // Railway требует dual stack lookup
+        host: redisURL.hostname,
+        port: parseInt(redisURL.port) || 6379,
+        username: redisURL.username,
+        password: redisURL.password,
+        maxRetriesPerRequest: 1,
+        lazyConnect: true,
+      };
+    })()
+  : undefined;
 
 // Create the video generation queue
-const videoQueue = new Queue<VideoGenerationJob>('video-generation', {
-  connection: redisConnection,
-  defaultJobOptions: {
-    attempts: config.queue.jobRetryAttempts,
-    backoff: {
-      type: 'exponential',
-      delay: config.queue.jobRetryDelay,
-    },
-    removeOnComplete: config.queue.removeCompletedAfter,
-    removeOnFail: config.queue.removeFailedAfter,
-  },
-});
+const videoQueue = redisConfig
+  ? new Queue<VideoGenerationJob>('video-generation', {
+      connection: redisConfig,
+      defaultJobOptions: {
+        attempts: config.queue.jobRetryAttempts,
+        backoff: {
+          type: 'exponential',
+          delay: config.queue.jobRetryDelay,
+        },
+        removeOnComplete: config.queue.removeCompletedAfter,
+        removeOnFail: config.queue.removeFailedAfter,
+      },
+    })
+  : null;
 
 /**
  * Add a new video generation job to the queue
@@ -40,6 +55,9 @@ const videoQueue = new Queue<VideoGenerationJob>('video-generation', {
  * @returns Job ID
  */
 export async function addVideoGenerationJob(data: VideoGenerationJob): Promise<string> {
+  if (!videoQueue) {
+    throw new Error('Video queue not available - Redis connection failed');
+  }
   const job = await videoQueue.add('generate-video', data);
   return job.id || '';
 }
@@ -50,6 +68,9 @@ export async function addVideoGenerationJob(data: VideoGenerationJob): Promise<s
  * @returns Job status or null if job not found
  */
 export async function getVideoJobStatus(jobId: string): Promise<string | null> {
+  if (!videoQueue) {
+    return null;
+  }
   const job = await videoQueue.getJob(jobId);
 
   if (!job) {
