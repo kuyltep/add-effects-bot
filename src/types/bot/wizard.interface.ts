@@ -115,7 +115,10 @@ export type EffectType =
   // FAL AI
   | 'plushify'
   | 'ghiblify'
-  | 'cartoonify';
+  | 'cartoonify'
+  | 'cartoonify_2d'
+  | 'style_transfer'
+
 
 /**
  * Data specific to the generation process

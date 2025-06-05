@@ -62,7 +62,7 @@ const OPENAI_EFFECTS = [
   'mitchells',
   'dreamworks',
 ];
-const FAL_AI_EFFECTS = ['plushify', 'ghiblify', 'cartoonify'];
+const FAL_AI_EFFECTS = ['plushify', 'ghiblify', 'cartoonify', 'cartoonify_2d', 'style_transfer'];
 
 // Initialize resources
 let redisConnection = createRedisConnection();

@@ -36,6 +36,8 @@ const effectOptions: { key: EffectType; labelKey: string }[] = [
   { key: 'plushify', labelKey: 'bot:generate.effect_plushify' },
   { key: 'ghiblify', labelKey: 'bot:generate.effect_ghiblify' },
   { key: 'cartoonify', labelKey: 'bot:generate.effect_cartoonify' },
+  { key: 'cartoonify_2d', labelKey: 'bot:generate.effect_cartoonify_2d' },
+  { key: 'style_transfer', labelKey: 'bot:generate.effect_style_transfer' },
 ];
 
 // Logo effect options
@@ -253,7 +255,7 @@ async function showBannerEffectSelection(ctx: MyContext): Promise<void> {
  * Handles the selection of an effect.
  */
 effectSelectorHandler.action(
-  /select_effect_(claymation|ghibli|pixar|bratz|cat|dog|sticker|new_disney|old_disney|mitchells|dreamworks|plushify|ghiblify|cartoonify)/,
+  /select_effect_(claymation|ghibli|pixar|bratz|cat|dog|sticker|new_disney|old_disney|mitchells|dreamworks|plushify|ghiblify|cartoonify|cartoonify_2d|style_transfer)/,
   async ctx => {
     await ctx.answerCbQuery();
     const state = ctx.wizard.state as GenerateWizardState;
