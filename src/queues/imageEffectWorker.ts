@@ -269,13 +269,11 @@ async function processImageEffectJob(job: Job<ImageEffectJobData>): Promise<void
       );
 
       Logger.info(`✅ [ImageEffectWorker] Изображение создано через OpenAI`, { finalOutputPath });
-    } else if (FAL_AI_EFFECTS.includes(effect)) {
-      // Process with FAL AI
-      Logger.info(`🤖 [ImageEffectWorker] Обработка через FAL AI`, { effect, localFilePath });
-      finalOutputPath = await applyImageEffect(localFilePath, effect, resolution as Resolution);
-      Logger.info(`✅ [ImageEffectWorker] Изображение обработано через FAL AI`, {
-        finalOutputPath,
-      });
+    } else if (FAL_AI_EFFECTS.includes(effect) || ['baby-version', 'hair-change', 'expression-change', 'age-progression'].includes(effect)) {
+      // Process with FAL AI (including appearance editing effects)
+      const appearancePrompt = job.data.appearancePrompt || job.data.prompt;
+      finalOutputPath = await applyImageEffect(localFilePath, effect, resolution as Resolution, appearancePrompt);
+
     } else if (OPENAI_EFFECTS.includes(effect) && apiProvider === 'openai') {
       // Pass the resolution to OpenAI service
       Logger.info(

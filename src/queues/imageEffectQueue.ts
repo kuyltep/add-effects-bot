@@ -16,6 +16,7 @@ export interface ImageEffectJobData {
   jointPhotoEffect?: string;
   effectObject?: string; // Type of object; logo, banner erc
   prompt?: string;
+  appearancePrompt?: string; // Specific prompt for appearance editing effects
   description?: string; // Дополнительное описание для эффектов
   chatId: string;
   messageId: number;
