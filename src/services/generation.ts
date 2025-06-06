@@ -101,12 +101,17 @@ export async function queueImageGenerationJob(
     // Generate a new ID if not provided
     const generationId = data.generationId || uuidv4();
 
+    // For appearance effects, use the appearance prompt in the record
+    const promptText = data.appearancePrompt 
+      ? `Effect: ${data.effect} - ${data.appearancePrompt}` 
+      : `Effect: ${data.effect}`;
+
     // Create a generation record
     await prisma.generation.create({
       data: {
         id: generationId,
         userId: data.userId,
-        prompt: `Effect: ${data.effect}`, // Use effect name as prompt
+        prompt: promptText, // Use effect name and appearance prompt
         seed: Math.floor(Math.random() * 2147483647), // Random seed
         status: GenerationStatus.PENDING,
         chatId: data.chatId,
@@ -127,6 +132,7 @@ export async function queueImageGenerationJob(
       userId: data.userId,
       fileIds: data.fileIds,
       effect: data.effect,
+      appearancePrompt: data.appearancePrompt,
     });
     throw error;
   }

@@ -118,7 +118,11 @@ export type EffectType =
   | 'cartoonify'
   | 'cartoonify_2d'
   | 'style_transfer'
-
+  // Appearance editing effects
+  | 'baby-version'
+  | 'hair-change'
+  | 'expression-change'
+  | 'age-progression'
 
 /**
  * Data specific to the generation process
@@ -136,4 +140,5 @@ export interface GenerationData {
   roomDesignEffect?: string; // For room design styling effects
   jointPhotoEffect?: string; // For joint photo styling effects
   description?: string; // Text description for prompt
+  appearancePrompt?: string; // Specific prompt for appearance editing effects
 }
