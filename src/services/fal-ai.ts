@@ -26,13 +26,19 @@ const effectModelMap: Record<string, string> = {
   cartoonify: 'fal-ai/cartoonify',
   hunyuan_avatar: 'fal-ai/hunyuan-avatar',
   style_transfer:"fal-ai/image-editing/style-transfer",
-  cartoonify_2d: "fal-ai/image-editing/cartoonify"
+  cartoonify_2d: "fal-ai/image-editing/cartoonify",
+  // Appearance editing effects
+  'baby-version': 'fal-ai/image-editing/baby-version',
+  'hair-change': 'fal-ai/image-editing/hair-change',
+  'expression-change': 'fal-ai/image-editing/expression-change',
+  'age-progression': 'fal-ai/image-editing/age-progression',
 };
 
 export async function applyImageEffect(
   imagePath: string,
   effect: EffectType,
-  resolution: Resolution = 'SQUARE'
+  resolution: Resolution = 'SQUARE',
+  prompt?: string
 ): Promise<string> {
   try {
     // Determine the model to use
@@ -43,16 +49,29 @@ export async function applyImageEffect(
 
     // Read the image file and convert to base64
     const imageBuffer = await fs.readFile(imagePath);
-    const file = new File([imageBuffer], path.basename(imagePath), {
+    const file = new File([new Uint8Array(imageBuffer)], path.basename(imagePath), {
       type: getMimeType(imagePath),
     });
     const url = await fal.storage.upload(file);
 
+    // Prepare input based on effect type
+    let input: any = {
+      image_url: url,
+    };
+
+    // For appearance editing effects, add prompt
+    if (['baby-version', 'hair-change', 'expression-change', 'age-progression'].includes(effect) && prompt) {
+      input = {
+        ...input,
+        prompt: prompt,
+        num_inference_steps: 28,
+        guidance_scale: 3.5,
+      };
+    }
+
     // Call FAL AI with the image
     const result = await fal.subscribe(modelId, {
-      input: {
-        image_url: url,
-      },
+      input,
     });
 
     // Extract the result URL
@@ -80,7 +99,7 @@ export async function applyImageEffect(
 
     return outputPath;
   } catch (error) {
-    Logger.error(`Error applying image effect: ${error.message}`, { effect, imagePath });
+    Logger.error(`Error applying image effect: ${error.message}`, { effect, imagePath, prompt });
     throw error;
   }
 }
@@ -110,7 +129,7 @@ export async function generateVideoWithFalEffect(
     } else {
       // If it's a local file, read it and create a File object
       const imageBuffer = await readFile(imagePathOrUrl);
-      imageData = new File([imageBuffer], path.basename(imagePathOrUrl), {
+      imageData = new File([new Uint8Array(imageBuffer)], path.basename(imagePathOrUrl), {
         type: getMimeType(imagePathOrUrl),
       });
     }
