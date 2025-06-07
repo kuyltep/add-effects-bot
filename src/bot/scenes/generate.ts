@@ -15,6 +15,9 @@ const logoEffectSelectorHandler = new Composer<MyContext>();
 const bannerEffectSelectorHandler = new Composer<MyContext>();
 const photoHandler = new Composer<MyContext>();
 const photoAndTextHandler = new Composer<MyContext>();
+const appearanceEffectSelectorHandler = new Composer<MyContext>();
+const appearancePhotoHandler = new Composer<MyContext>();
+const appearancePromptHandler = new Composer<MyContext>();
 
 const effectsPerPage = 8;
 
@@ -59,6 +62,14 @@ const bannerEffectOptions = [
   'banner_organic',
 ];
 
+// Appearance editing effect options
+const appearanceEffectOptions: { key: EffectType; labelKey: string }[] = [
+  { key: 'baby-version', labelKey: 'bot:generate.appearance_effect_baby_version' },
+  { key: 'hair-change', labelKey: 'bot:generate.appearance_effect_hair_change' },
+  { key: 'expression-change', labelKey: 'bot:generate.appearance_effect_expression_change' },
+  { key: 'age-progression', labelKey: 'bot:generate.appearance_effect_age_progression' },
+];
+
 // WIZARD STEP TRANSITIONS & HANDLERS
 
 /**
@@ -68,6 +79,7 @@ async function showInitialOptions(ctx: MyContext): Promise<void> {
   const stylizePhotoText = ctx.i18n.t('bot:generate.effect_photo');
   const videoEffectsText = ctx.i18n.t('bot:generate.effect_video');
   const stylizeLogoText = ctx.i18n.t('bot:generate.stylize_logo');
+  const appearanceEditingText = ctx.i18n.t('bot:generate.appearance_editing');
   // const stylizeBannerText = ctx.i18n.t('bot:generate.stylize_banner');
   // const stylizeRoomDesign = ctx.i18n.t('bot:generate.room_design');
   // const jointPhoto = ctx.i18n.t('bot:generate.joint_photo');
@@ -78,6 +90,7 @@ async function showInitialOptions(ctx: MyContext): Promise<void> {
       [Markup.button.callback(stylizePhotoText, 'select_photo_styling')],
       [Markup.button.callback(videoEffectsText, 'select_video_effects')],
       [Markup.button.callback(stylizeLogoText, 'select_logo_styling')],
+      [Markup.button.callback(appearanceEditingText, 'select_appearance_editing')],
       // [Markup.button.callback(stylizeBannerText, 'select_banner_styling')],
       // [Markup.button.callback(stylizeRoomDesign, 'select_room_design')],
       // [Markup.button.callback(jointPhoto, 'select_joint_photo')],
@@ -188,6 +201,44 @@ async function showLogoEffectSelection(ctx: MyContext): Promise<void> {
     }
   } catch (error) {
     Logger.warn('Failed to edit or send logo effect selection message, sending new one.', {
+      error,
+    });
+    await ctx.reply(messageText, {
+      parse_mode: 'HTML',
+      reply_markup: replyMarkup,
+    });
+  }
+}
+
+/**
+ * Sends the appearance effect selection message and keyboard.
+ */
+async function showAppearanceEffectSelection(ctx: MyContext): Promise<void> {
+  // Create buttons for each appearance effect
+  const effectButtons = appearanceEffectOptions.map(option =>
+    Markup.button.callback(ctx.i18n.t(option.labelKey), `select_appearance_effect_${option.key}`)
+  );
+
+  // Arrange buttons in one column
+  const keyboardRows = effectButtons.map(button => [button]);
+
+  const messageText = ctx.i18n.t('bot:generate.select_appearance_effect_prompt');
+  const replyMarkup = Markup.inlineKeyboard(keyboardRows).reply_markup;
+
+  try {
+    if (ctx.callbackQuery?.message) {
+      await ctx.editMessageText(messageText, {
+        parse_mode: 'HTML',
+        reply_markup: replyMarkup,
+      });
+    } else {
+      await ctx.reply(messageText, {
+        parse_mode: 'HTML',
+        reply_markup: replyMarkup,
+      });
+    }
+  } catch (error) {
+    Logger.warn('Failed to edit or send appearance effect selection message, sending new one.', {
       error,
     });
     await ctx.reply(messageText, {
@@ -318,6 +369,41 @@ logoEffectSelectorHandler.action(
 
     // Move to the photo handler step
     return ctx.wizard.selectStep(4);
+  }
+);
+
+/**
+ * Handles the selection of an appearance effect.
+ */
+appearanceEffectSelectorHandler.action(
+  /select_appearance_effect_(baby-version|hair-change|expression-change|age-progression)/,
+  async ctx => {
+    await ctx.answerCbQuery();
+    const state = ctx.wizard.state as GenerateWizardState;
+    const selectedAppearanceEffect = ctx.match[1] as EffectType;
+
+    if (!state?.generationData) {
+      Logger.warn('State missing in appearance effect selection', { userId: ctx.from?.id });
+      return exitWithError(ctx, 'bot:errors.general');
+    }
+
+    // Store the selected appearance effect
+    state.generationData.effect = selectedAppearanceEffect;
+
+    // Prompt for photo
+    try {
+      await ctx.editMessageText(ctx.i18n.t('bot:generate.send_photo_for_appearance_effect'), {
+        parse_mode: 'HTML',
+      });
+    } catch (error) {
+      // If editing fails, send a new message
+      await ctx.reply(ctx.i18n.t('bot:generate.send_photo_for_appearance_effect'), {
+        parse_mode: 'HTML',
+      });
+    }
+
+    // Move to the appearance photo handler step
+    return ctx.wizard.selectStep(7);
   }
 );
 
@@ -532,6 +618,99 @@ photoAndTextHandler.on('message', async ctx => {
   await ctx.reply(ctx.i18n.t('bot:generate.banner_wait_for_description'));
 });
 
+// Handler for processing user's photo input for appearance effects
+appearancePhotoHandler.on('photo', async ctx => {
+  const photoSizes = ctx.message.photo;
+  const largestPhoto = photoSizes[photoSizes.length - 1];
+  const state = ctx.wizard.state as GenerateWizardState;
+  state.generationData.fileIds = [largestPhoto.file_id];
+  await ctx.reply(ctx.i18n.t('bot:generate.send_appearance_prompt'));
+  return ctx.wizard.next(); // Move to prompt handler
+});
+
+// Handle document messages for appearance effects
+appearancePhotoHandler.on('document', async ctx => {
+  const { document } = ctx.message;
+  if (!document.mime_type?.startsWith('image/')) {
+    await ctx.reply(ctx.i18n.t('bot:generate.not_an_image'));
+    return; // Stay in this step
+  }
+  const state = ctx.wizard.state as GenerateWizardState;
+  state.generationData.fileIds = [document.file_id];
+  await ctx.reply(ctx.i18n.t('bot:generate.send_appearance_prompt'));
+  return ctx.wizard.next(); // Move to prompt handler
+});
+
+// Handle text messages (invalid input in appearance photo step)
+appearancePhotoHandler.on('text', async ctx => {
+  if (ctx.message.text === '/cancel') {
+    return exitScene(ctx, 'bot:generate.cancelled');
+  }
+  await ctx.reply(ctx.i18n.t('bot:generate.send_photo_for_appearance_effect'));
+});
+
+// Handle all other message types in appearance photo step
+appearancePhotoHandler.on('message', async ctx => {
+  await ctx.reply(ctx.i18n.t('bot:generate.send_photo_for_appearance_effect'));
+});
+
+// Handle appearance prompt input
+appearancePromptHandler.on('text', async ctx => {
+  if (ctx.message.text === '/cancel') {
+    return exitScene(ctx, 'bot:generate.cancelled');
+  }
+
+  const state = ctx.wizard.state as GenerateWizardState;
+  if (!state?.generationData || !state?.userData?.id || !state?.userSettings?.resolution) {
+    Logger.warn('State missing in appearance prompt handler', { userId: ctx.from?.id });
+    return exitWithError(ctx, 'bot:errors.general');
+  }
+
+  const originalPrompt = ctx.message.text;
+  
+  try {
+    // Import and use the language service to translate the prompt
+    const { processPrompt } = await import('../../services/language');
+    const { translatedPrompt } = await processPrompt(originalPrompt);
+    
+    // Store the translated prompt
+    state.generationData.appearancePrompt = translatedPrompt;
+
+    const { effect } = state.generationData;
+    const { id: userId, language } = state.userData;
+    const { resolution } = state.userSettings;
+
+    // Send confirmation and queue the job
+    const statusMessage = await ctx.reply(ctx.i18n.t('bot:generate.processing_queued'), {
+      parse_mode: 'HTML',
+    });
+
+    await queueImageGenerationJob({
+      userId,
+      generationId: '', // Will be generated in the service
+      fileIds: state.generationData.fileIds, // Pass file IDs from state
+      effect,
+      appearancePrompt: translatedPrompt,
+      chatId: ctx.chat?.id.toString() || '',
+      messageId: statusMessage.message_id,
+      language: language || ctx.i18n.locale || 'en',
+      resolution: resolution,
+      apiProvider: 'fal-ai', // Appearance effects use FAL AI
+    });
+  } catch (error) {
+    Logger.error(error, { context: 'queueImageGenerationJob', userId: state.userData.id });
+    await ctx.reply(ctx.i18n.t('bot:generate.queue_error'));
+  }
+
+  // Leave the scene after queuing
+  await ctx.scene.leave();
+});
+
+// Handle non-text messages in appearance prompt step
+appearancePromptHandler.on('message', async ctx => {
+  await ctx.reply(ctx.i18n.t('bot:generate.send_appearance_prompt'));
+});
+
 // Handle initial options
 initialOptionHandler.action('select_photo_styling', async ctx => {
   await ctx.answerCbQuery();
@@ -549,6 +728,12 @@ initialOptionHandler.action('select_logo_styling', async ctx => {
   await ctx.answerCbQuery();
   await showLogoEffectSelection(ctx);
   return ctx.wizard.selectStep(2); // Move to logo effect selection handler step
+});
+
+initialOptionHandler.action('select_appearance_editing', async ctx => {
+  await ctx.answerCbQuery();
+  await showAppearanceEffectSelection(ctx);
+  return ctx.wizard.selectStep(9); // Move to appearance effect selection handler step
 });
 
 initialOptionHandler.action('select_banner_styling', async ctx => {
@@ -603,7 +788,13 @@ export const generateScene = new Scenes.WizardScene<MyContext>(
   // Step 5: Handle banner effect selection
   bannerEffectSelectorHandler,
   // Step 6: Handle photo + text input
-  photoAndTextHandler
+  photoAndTextHandler,
+  // Step 7: Handle appearance photo input
+  appearancePhotoHandler,
+  // Step 8: Handle appearance prompt input
+  appearancePromptHandler,
+  // Step 9: Handle appearance effect selection
+  appearanceEffectSelectorHandler
 );
 
 // Generic error handler for the scene
