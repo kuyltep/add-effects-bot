@@ -142,7 +142,7 @@ packagesScene.action(/pay_package_(.+)/, async ctx => {
 
     try {
       await updatePaymentOnMS(selectedProduct.paymentId, {
-        userId: user.telegramId,
+        userId: user.id,
         username: user.telegramUsername,
         amount: selectedProduct.price,
         generationsAdded: selectedProduct.generations,
