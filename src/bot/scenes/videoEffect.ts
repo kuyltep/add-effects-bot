@@ -126,8 +126,6 @@ async function showEffectSelectionNoImage(ctx: MyContext) {
     effectButtons.push(row);
   }
 
-  // Add back button in its own row
-  effectButtons.push([Markup.button.callback(ctx.i18n.t('bot:video.back_button'), 'back')]);
 
   // Show effect selection
   const sentMessage = await ctx.reply(
@@ -173,8 +171,6 @@ async function showEffectSelection(ctx: MyContext, imagePath: string) {
     effectButtons.push(row);
   }
 
-  // Add back button in its own row
-  effectButtons.push([Markup.button.callback(ctx.i18n.t('bot:video.back_button'), 'back')]);
 
   // Show image and prompt for effect selection
   const sentMessage = await ctx.replyWithPhoto(
@@ -229,7 +225,7 @@ videoEffectScene.action(/^select_effect:(.+)$/, async ctx => {
     await ctx.reply(ctx.i18n.t('bot:video.enter_prompt'));
   } else {
     // Otherwise, prompt for photo upload
-    await ctx.reply(ctx.i18n.t('bot:generate.send_photo_for_effect'));
+    await ctx.reply(ctx.i18n.t('bot:generate.send_photo_for_video_effect'));
   }
 });
 
@@ -311,7 +307,7 @@ videoEffectScene.on('text', async ctx => {
     state.waitingForPrompt = false;
 
     // Now ask for photo
-    await ctx.reply(ctx.i18n.t('bot:generate.send_photo_for_effect'));
+    await ctx.reply(ctx.i18n.t('bot:generate.send_photo_for_video_effect'));
     return;
   }
 
@@ -322,7 +318,7 @@ videoEffectScene.on('text', async ctx => {
 
   // If we have a selected effect but no image yet, remind them
   if (state.selectedEffect) {
-    await ctx.reply(ctx.i18n.t('bot:generate.send_photo_for_effect'));
+    await ctx.reply(ctx.i18n.t('bot:generate.send_photo_for_video_effect'));
   }
 });
 

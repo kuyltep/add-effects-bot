@@ -8,6 +8,16 @@ import {
 import { initializeWizardState, exitScene } from '../../services/scene';
 import { Logger } from '../../utils/rollbar.logger';
 
+// Resolution helper function
+function getResolutionInfo(resolution: string) {
+  const resolutions = {
+    square: { width: 1024, height: 1024 },
+    vertical: { width: 768, height: 1024 },
+    horizontal: { width: 1024, height: 768 }
+  };
+  return resolutions[resolution.toLowerCase()] || resolutions.square;
+}
+
 // STEP HANDLERS
 const initialOptionHandler = new Composer<MyContext>();
 const effectSelectorHandler = new Composer<MyContext>();
@@ -320,14 +330,25 @@ effectSelectorHandler.action(
     // Store the selected effect
     state.generationData.effect = selectedEffect;
 
-    // Prompt for photo
+    // Prompt for photo with resolution info
+    const resolution = state.userSettings?.resolution || 'square';
+    const resolutionInfo = getResolutionInfo(resolution);
+    
     try {
-      await ctx.editMessageText(ctx.i18n.t('bot:generate.send_photo_for_effect'), {
+      await ctx.editMessageText(ctx.i18n.t('bot:generate.send_photo_for_effect', {
+        resolution: ctx.i18n.t(`bot:settings.resolution_${resolution.toLowerCase()}`),
+        width: resolutionInfo.width,
+        height: resolutionInfo.height
+      }), {
         parse_mode: 'HTML',
       });
     } catch (error) {
       // If editing fails (e.g., message too old), send a new message
-      await ctx.reply(ctx.i18n.t('bot:generate.send_photo_for_effect'), {
+      await ctx.reply(ctx.i18n.t('bot:generate.send_photo_for_effect', {
+        resolution: ctx.i18n.t(`bot:settings.resolution_${resolution.toLowerCase()}`),
+        width: resolutionInfo.width,
+        height: resolutionInfo.height
+      }), {
         parse_mode: 'HTML',
       });
     }
@@ -355,14 +376,25 @@ logoEffectSelectorHandler.action(
     // Store the selected logo effect
     state.generationData.logoEffect = selectedLogoEffect;
 
-    // Prompt for photo
+    // Prompt for photo with resolution info
+    const resolution = state.userSettings?.resolution || 'square';
+    const resolutionInfo = getResolutionInfo(resolution);
+    
     try {
-      await ctx.editMessageText(ctx.i18n.t('bot:generate.send_logo_for_effect'), {
+      await ctx.editMessageText(ctx.i18n.t('bot:generate.send_logo_for_effect', {
+        resolution: ctx.i18n.t(`bot:settings.resolution_${resolution.toLowerCase()}`),
+        width: resolutionInfo.width,
+        height: resolutionInfo.height
+      }), {
         parse_mode: 'HTML',
       });
     } catch (error) {
       // If editing fails, send a new message
-      await ctx.reply(ctx.i18n.t('bot:generate.send_logo_for_effect'), {
+      await ctx.reply(ctx.i18n.t('bot:generate.send_logo_for_effect', {
+        resolution: ctx.i18n.t(`bot:settings.resolution_${resolution.toLowerCase()}`),
+        width: resolutionInfo.width,
+        height: resolutionInfo.height
+      }), {
         parse_mode: 'HTML',
       });
     }
@@ -390,14 +422,25 @@ appearanceEffectSelectorHandler.action(
     // Store the selected appearance effect
     state.generationData.effect = selectedAppearanceEffect;
 
-    // Prompt for photo
+    // Prompt for photo with resolution info
+    const resolution = state.userSettings?.resolution || 'square';
+    const resolutionInfo = getResolutionInfo(resolution);
+    
     try {
-      await ctx.editMessageText(ctx.i18n.t('bot:generate.send_photo_for_appearance_effect'), {
+      await ctx.editMessageText(ctx.i18n.t('bot:generate.send_photo_for_appearance_effect', {
+        resolution: ctx.i18n.t(`bot:settings.resolution_${resolution.toLowerCase()}`),
+        width: resolutionInfo.width,
+        height: resolutionInfo.height
+      }), {
         parse_mode: 'HTML',
       });
     } catch (error) {
       // If editing fails, send a new message
-      await ctx.reply(ctx.i18n.t('bot:generate.send_photo_for_appearance_effect'), {
+      await ctx.reply(ctx.i18n.t('bot:generate.send_photo_for_appearance_effect', {
+        resolution: ctx.i18n.t(`bot:settings.resolution_${resolution.toLowerCase()}`),
+        width: resolutionInfo.width,
+        height: resolutionInfo.height
+      }), {
         parse_mode: 'HTML',
       });
     }
@@ -566,12 +609,32 @@ photoHandler.on('text', async ctx => {
   if (ctx.message.text === '/cancel') {
     return exitScene(ctx, 'bot:generate.cancelled');
   }
-  await ctx.reply(ctx.i18n.t('bot:generate.send_photo_for_effect'));
+  const state = ctx.wizard.state as GenerateWizardState;
+  const resolution = state.userSettings?.resolution || 'square';
+  const resolutionInfo = getResolutionInfo(resolution);
+  
+  await ctx.reply(ctx.i18n.t('bot:generate.send_photo_for_effect', {
+    resolution: ctx.i18n.t(`bot:settings.resolution_${resolution.toLowerCase()}`),
+    width: resolutionInfo.width,
+    height: resolutionInfo.height
+  }), {
+    parse_mode: 'HTML',
+  });
 });
 
 // Handle all other message types in photo step
 photoHandler.on('message', async ctx => {
-  await ctx.reply(ctx.i18n.t('bot:generate.send_photo_for_effect'));
+  const state = ctx.wizard.state as GenerateWizardState;
+  const resolution = state.userSettings?.resolution || 'square';
+  const resolutionInfo = getResolutionInfo(resolution);
+  
+  await ctx.reply(ctx.i18n.t('bot:generate.send_photo_for_effect', {
+    resolution: ctx.i18n.t(`bot:settings.resolution_${resolution.toLowerCase()}`),
+    width: resolutionInfo.width,
+    height: resolutionInfo.height
+  }), {
+    parse_mode: 'HTML',
+  });
 });
 
 // Handle photo messages
@@ -646,12 +709,30 @@ appearancePhotoHandler.on('text', async ctx => {
   if (ctx.message.text === '/cancel') {
     return exitScene(ctx, 'bot:generate.cancelled');
   }
-  await ctx.reply(ctx.i18n.t('bot:generate.send_photo_for_appearance_effect'));
+  const state = ctx.wizard.state as GenerateWizardState;
+  const resolution = state.userSettings?.resolution || 'square';
+  const resolutionInfo = getResolutionInfo(resolution);
+  
+  await ctx.reply(ctx.i18n.t('bot:generate.send_photo_for_appearance_effect', {
+    resolution: ctx.i18n.t(`bot:settings.resolution_${resolution.toLowerCase()}`),
+    width: resolutionInfo.width,
+    height: resolutionInfo.height
+  }), {
+    parse_mode: 'HTML',
+  });
 });
 
 // Handle all other message types in appearance photo step
 appearancePhotoHandler.on('message', async ctx => {
-  await ctx.reply(ctx.i18n.t('bot:generate.send_photo_for_appearance_effect'));
+  const state = ctx.wizard.state as GenerateWizardState;
+  const resolution = state.userSettings?.resolution || 'square';
+  const resolutionInfo = getResolutionInfo(resolution);
+  
+  await ctx.reply(ctx.i18n.t('bot:generate.send_photo_for_appearance_effect', {
+    resolution: ctx.i18n.t(`bot:settings.resolution_${resolution.toLowerCase()}`),
+    width: resolutionInfo.width,
+    height: resolutionInfo.height
+  }));
 });
 
 // Handle appearance prompt input
