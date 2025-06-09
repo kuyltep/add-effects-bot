@@ -53,10 +53,7 @@ export async function createUser(
           useNegativePrompt: false,
           useSeed: false,
           batchSize: 3,
-          resolution: 'HORIZONTAL',
           model: 'rev3',
-          // Handle language by casting to any to avoid type issues
-          // The schema supports this field, but TypeScript definitions may be outdated
           language: language,
         },
       });
@@ -201,7 +198,6 @@ export async function getOrCreateUserSettings(userId: string) {
           useNegativePrompt: false,
           useSeed: false,
           batchSize: 3,
-          resolution: Resolution.HORIZONTAL,
           model: 'rev3',
         },
       });
