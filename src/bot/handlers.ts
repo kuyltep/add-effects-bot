@@ -172,10 +172,6 @@ export function setupVideoCommand() {
 // Обработка кнопок клавиатуры
 export function setupKeyboardHandlers() {
   bot.on(message('text'), async (ctx, next) => {
-    // Skip if we're in a scene
-    if (ctx.scene?.current) {
-      return next();
-    }
 
     const text = ctx.message.text;
     // Ensure locale is set, default to 'ru' if not
