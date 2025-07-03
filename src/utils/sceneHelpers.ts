@@ -46,14 +46,10 @@ export function createMainKeyboardMiddleware(): Middleware<MyContext> {
       if (ctx.scene?.current) {
         const currentSceneId = ctx.scene.current.id;
 
-        if (currentSceneId === targetScene) {
-          return next();
-        }
-
         try {
           // Force leave current scene and enter target scene
           await ctx.scene.leave();
-          return ctx.scene.enter(targetScene);
+          return await ctx.scene.enter(targetScene);
         } catch (error) {
           Logger.error(`Error transitioning scenes: ${error.message}`, {
             from: currentSceneId,
@@ -62,11 +58,11 @@ export function createMainKeyboardMiddleware(): Middleware<MyContext> {
           });
           // Try to recover by force leaving and entering
           await ctx.scene.leave();
-          return ctx.scene.enter(targetScene);
+          return await ctx.scene.enter(targetScene);
         }
       } else {
         // Not in a scene, just enter the target scene
-        return ctx.scene.enter(targetScene);
+        return await ctx.scene.enter(targetScene);
       }
     }
 

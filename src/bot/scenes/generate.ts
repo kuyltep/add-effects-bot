@@ -856,7 +856,7 @@ export const generateScene = new Scenes.WizardScene<MyContext>(
     }
 
     await showInitialOptions(ctx);
-    return ctx.wizard.next(); // Move to initial options handler step
+    return ctx.wizard.selectStep(1); // Move to initial options handler step
   },
   // Step 1: Handle initial options selection
   initialOptionHandler,

@@ -44,8 +44,8 @@ const scenes = [
   videoScene,
   upgradeScene,
   videoEffectScene,
-  roomDesignScene,
-  jointPhotoScene,
+  // roomDesignScene,
+  // jointPhotoScene,
 ];
 
 // Создаем менеджер сцен
