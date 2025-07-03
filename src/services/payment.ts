@@ -18,7 +18,8 @@ export async function addGenerationsToUser(userId: string, count: number): Promi
   try {
     // Update user's generation count
     const user = await prisma.user.update({
-      where: { telegramId: userId },
+      where: { 
+        telegramId: userId },
       data: {
         remainingGenerations: {
           increment: count,

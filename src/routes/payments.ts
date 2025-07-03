@@ -37,7 +37,7 @@ export default async function (fastify: FastifyInstance, options: FastifyPluginO
 
       // Find the user in our database
       const user = await prisma.user.findUnique({
-        where: { id: userId },
+        where: { telegramId: userId },
       });
 
       if (!user) {
